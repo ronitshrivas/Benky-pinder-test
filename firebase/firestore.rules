@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Courses collection (public read, admin write)
+    match /courses/{courseId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Retreats collection (public read, admin write)
+    match /retreats/{retreatId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Blog posts (public read, admin write)
+    match /blog/{postId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Gallery (public read, admin write)
+    match /gallery/{itemId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Orders (user reads own, admin reads all)
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // Inquiries (admin only)
+    match /inquiries/{inquiryId} {
+      allow read: if isAdmin();
+      allow create: if true; // Anyone can submit a contact form
+      allow update, delete: if isAdmin();
+    }
+
+    // Subscribers (admin read, anyone can create)
+    match /subscribers/{subId} {
+      allow read: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // OTPs (server-side only, but allow read for verification)
+    match /otps/{email} {
+      allow read, write: if false; // Only accessible via admin SDK
+    }
+
+    // Course progress (user reads/writes own)
+    match /progress/{progressId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated();
+    }
+
+    // Reviews (public read, authenticated create)
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+  }
+}

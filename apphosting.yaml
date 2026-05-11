@@ -1,0 +1,99 @@
+runConfig:
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyAc3dCkDdpjhobU3GL0Rj23zf8vYGTPCGM"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "manishpokharel-2fd2d.firebaseapp.com"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "manishpokharel-2fd2d"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "manishpokharel-2fd2d.firebasestorage.app"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "864064987730"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:864064987730:web:1dc79851814c3b8efc358b"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_SQUARE_APP_ID
+    value: "sandbox-sq0idb-RQJeFnXWPYvMM59dRqq5Zw"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_SQUARE_LOCATION_ID
+    value: "LF70P7VKY4ZQW"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: SQUARE_ENVIRONMENT
+    value: "sandbox"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: EMAIL_HOST
+    value: "smtp.gmail.com"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: EMAIL_PORT
+    value: "587"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: EMAIL_USER
+    value: "prajwalsubedi05@gmail.com"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: EMAIL_FROM
+    value: "Becky Pinder Yoga <prajwalsubedi05@gmail.com>"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: ADMIN_EMAIL
+    value: "prajwalsubedi05@gmail.com"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: SQUARE_ACCESS_TOKEN
+    secret: squareAccessToken
+    availability:
+      - RUNTIME
+
+  - variable: EMAIL_PASSWORD
+    secret: emailPassword
+    availability:
+      - RUNTIME

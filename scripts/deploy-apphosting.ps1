@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 
-$projectId = 'manishpokharel-2fd2d'
+$projectId = 'beckypinder-bcb30'
 $region = 'asia-southeast1'
 $firebase = 'firebase.cmd'
 
@@ -42,6 +42,7 @@ function Set-Secret {
 }
 
 Set-Secret -Key 'squareAccessToken' -Value (Get-EnvValue 'SQUARE_ACCESS_TOKEN')
+Set-Secret -Key 'paypalClientSecret' -Value (Get-EnvValue 'PAYPAL_CLIENT_SECRET')
 Set-Secret -Key 'emailPassword' -Value (Get-EnvValue 'EMAIL_PASSWORD')
 
 & $firebase deploy --project $projectId --config (Join-Path $repoRoot 'firebase.json')

@@ -97,9 +97,9 @@ Whether in some far flung location or virtually.
             <p>
               I flavour everything with the ethos that life is to be lived fully, abundantly and with as much joy as we can squeeze in!
             </p>
-            <p className="font-serif text-primary text-xl mt-8">
+            {/* <p className="font-serif text-primary text-xl mt-8">
               I look forward to welcome you on this.
-            </p>
+            </p> */}
           </div>
         </div>
       </section>

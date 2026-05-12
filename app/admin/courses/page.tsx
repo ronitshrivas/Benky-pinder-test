@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Trash2, Edit2, X, Upload, Video, Save, Eye, EyeOff, DollarSign, GripVertical } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getCourses, addCourse, updateCourse, deleteCourse } from '@/lib/firestore';
-import { uploadFile } from '@/lib/firebase';
+import { uploadFile, uploadFileWithProgress } from '@/lib/firebase';
 import { Course, Lesson } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -23,6 +23,7 @@ export default function AdminCoursesPage() {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [activeSection, setActiveSection] = useState<'details' | 'lessons'>('details');
   const thumbRef = useRef<HTMLInputElement>(null);
 
@@ -60,12 +61,24 @@ export default function AdminCoursesPage() {
 
   const handleLessonVideo = async (index: number, file: File) => {
     try {
-      toast.loading('Uploading video...', { id: 'upload' });
-      const url = await uploadFile(file, `courses/videos/${Date.now()}_${file.name}`);
+      const uploadKey = `lesson-${index}`;
+      setUploadProgress(prev => ({ ...prev, [uploadKey]: 0 }));
+      
+      const url = await uploadFileWithProgress(
+        file, 
+        `courses/videos/${Date.now()}_${file.name}`,
+        (progress) => {
+          setUploadProgress(prev => ({ ...prev, [uploadKey]: progress }));
+        }
+      );
+      
       updateLesson(index, 'videoUrl', url);
-      toast.success('Video uploaded!', { id: 'upload' });
+      toast.success('Video uploaded!');
     } catch (e) {
-      toast.error('Upload failed', { id: 'upload' });
+      toast.error('Upload failed');
+    } finally {
+      // Keep progress at 100 for a moment before clearing? 
+      // Or just leave it as is, the UI will show "Uploaded" anyway
     }
   };
 
@@ -75,7 +88,15 @@ export default function AdminCoursesPage() {
     try {
       let thumbnail = form.thumbnail;
       if (thumbnailFile) {
-        thumbnail = await uploadFile(thumbnailFile, `courses/thumbnails/${Date.now()}_${thumbnailFile.name}`);
+        const uploadKey = 'thumbnail';
+        setUploadProgress(prev => ({ ...prev, [uploadKey]: 0 }));
+        thumbnail = await uploadFileWithProgress(
+          thumbnailFile, 
+          `courses/thumbnails/${Date.now()}_${thumbnailFile.name}`,
+          (progress) => {
+            setUploadProgress(prev => ({ ...prev, [uploadKey]: progress }));
+          }
+        );
       }
       const courseData = {
         ...form,
@@ -131,8 +152,18 @@ export default function AdminCoursesPage() {
     setLessons([]);
     setThumbnailFile(null);
     setThumbnailPreview('');
+    setUploadProgress({});
     setActiveSection('details');
   };
+
+  const ProgressBar = ({ progress }: { progress: number }) => (
+    <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2 overflow-hidden">
+      <div 
+        className="bg-accent h-full transition-all duration-300 ease-out" 
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-surface">
@@ -266,9 +297,17 @@ export default function AdminCoursesPage() {
                       {thumbnailPreview ? (
                         <img src={thumbnailPreview} alt="Thumbnail" className="w-full h-32 object-cover rounded" />
                       ) : (
-                        <><Upload className="w-6 h-6 text-text-light mx-auto mb-1" /><p className="text-xs text-text-light">Upload thumbnail image</p></>
                       )}
                     </div>
+                    {uploadProgress['thumbnail'] !== undefined && uploadProgress['thumbnail'] < 100 && (
+                      <div className="mt-2">
+                        <div className="flex justify-between text-[10px] text-text-light mb-1">
+                          <span>Uploading thumbnail...</span>
+                          <span>{Math.round(uploadProgress['thumbnail'])}%</span>
+                        </div>
+                        <ProgressBar progress={uploadProgress['thumbnail']} />
+                      </div>
+                    )}
                     <input ref={thumbRef} type="file" accept="image/*" onChange={handleThumbnailChange} className="hidden" />
                   </div>
                   <div>
@@ -303,12 +342,24 @@ export default function AdminCoursesPage() {
                         <input type="text" value={lesson.duration || ''} onChange={(e) => updateLesson(i, 'duration', e.target.value)} className="input-field text-sm" placeholder="Duration (e.g., 15 min)" />
                         <div className="flex items-center gap-2">
                           {lesson.videoUrl ? (
-                            <span className="text-xs text-green-600 flex items-center gap-1"><Video className="w-3 h-3" /> Uploaded</span>
+                            <span className="text-xs text-green-600 flex items-center gap-1"><Check className="w-3 h-3" /> Uploaded</span>
                           ) : (
-                            <label className="flex items-center gap-2 cursor-pointer text-xs text-accent hover:underline">
-                              <Upload className="w-3 h-3" /> Upload Video
-                              <input type="file" accept="video/*" onChange={(e) => { if (e.target.files?.[0]) handleLessonVideo(i, e.target.files[0]); }} className="hidden" />
-                            </label>
+                            <div className="flex-1">
+                              {uploadProgress[`lesson-${i}`] !== undefined && uploadProgress[`lesson-${i}`] < 100 ? (
+                                <div className="w-full">
+                                  <div className="flex justify-between text-[10px] text-text-light mb-1">
+                                    <span>Uploading video...</span>
+                                    <span>{Math.round(uploadProgress[`lesson-${i}`])}%</span>
+                                  </div>
+                                  <ProgressBar progress={uploadProgress[`lesson-${i}`]} />
+                                </div>
+                              ) : (
+                                <label className="flex items-center gap-2 cursor-pointer text-xs text-accent hover:underline">
+                                  <Upload className="w-3 h-3" /> Upload Video
+                                  <input type="file" accept="video/*" onChange={(e) => { if (e.target.files?.[0]) handleLessonVideo(i, e.target.files[0]); }} className="hidden" />
+                                </label>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>

@@ -140,7 +140,7 @@ export default function CourseDetailPage() {
               <>
                 <div className="flex items-center gap-2 text-text-light bg-surface-cream rounded-lg px-4 py-3 mb-4">
                   <Lock className="w-4 h-4" />
-                  Secure checkout via Square
+                  Secure checkout via Square or PayPal
                 </div>
                 <Link href={`/courses/${course.id}/purchase`} className="btn-primary w-full text-center inline-flex items-center justify-center gap-2">
                   Buy Course

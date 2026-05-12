@@ -222,7 +222,7 @@ export default function CoursesPage() {
             {[
               { step: '01', title: 'Choose Your Course', desc: 'Browse our library and find the perfect programme for your goals.' },
               { step: '02', title: 'Make Payment', desc: 'Secure checkout via Square. You\'ll receive an invoice by email.' },
-              { step: '03', title: 'Start Learning', desc: 'Instant acces to classes you can take anytime/anywhere.' },
+              { step: '03', title: 'Start Learning', desc: 'Instant access to classes you can take anytime/anywhere.' },
             ].map((item) => (
                 <div key={item.step}>
                   <div className="text-accent font-serif text-4xl mb-3">{item.step}</div>

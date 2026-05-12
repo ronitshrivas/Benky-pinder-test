@@ -10,6 +10,9 @@ import { Retreat, GalleryItem } from '@/types';
 import { formatDate, formatPrice } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GalleryViewer } from '@/components/ui/GalleryViewer';
+import { BookingModal } from '@/components/ui/BookingModal';
+import { useAuth } from '@/lib/auth-context';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export default function RetreatDetailPage() {
@@ -17,6 +20,10 @@ export default function RetreatDetailPage() {
   const [retreat, setRetreat] = useState<Retreat | null>(null);
   const [loading, setLoading] = useState(true);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+
+  const { user, userData, refreshUserData } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     let active = true;
@@ -151,7 +158,7 @@ export default function RetreatDetailPage() {
                       </div>
                       {retreat.depositAmount ? (
                         <p className="text-sm text-text-light mb-2">
-                          Deposit amount: <span className="font-semibold text-primary">{formatPrice(retreat.depositAmount, retreat.currency || 'USD')}</span>
+                          Deposit amount: <span className="font-semibold text-primary">{formatPrice(retreat.depositAmount, retreat.currency || 'AUD')}</span>
                         </p>
                       ) : null}
                       <p className="text-sm text-text-light whitespace-pre-line">{retreat.depositNote}</p>
@@ -250,14 +257,14 @@ export default function RetreatDetailPage() {
           <aside className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
               <p className="text-text-light text-sm">Retreat price</p>
-              <div className="font-serif text-4xl text-accent mt-2 mb-2">{formatPrice(retreat.price, retreat.currency || 'USD')}</div>
+              <div className="font-serif text-4xl text-accent mt-2 mb-2">{formatPrice(retreat.price, retreat.currency || 'AUD')}</div>
               <p className="text-sm text-text-light mb-6">Per person, all inclusive</p>
 
               <div className="rounded-lg bg-surface-cream p-4 mb-6 space-y-3">
                 <p className="text-sm text-primary font-semibold mb-1">Secure your place</p>
                 <p className="text-text-light text-sm">
                   {retreat.depositAmount
-                    ? `Deposit options are available from ${formatPrice(retreat.depositAmount, retreat.currency || 'USD')}.`
+                    ? `Deposit options are available from ${formatPrice(retreat.depositAmount, retreat.currency || 'AUD')}.`
                     : 'Your retreat price is paid in full to reserve your place.'}
                 </p>
                 {retreat.balanceDueDate ? (
@@ -268,10 +275,26 @@ export default function RetreatDetailPage() {
                 ) : null}
               </div>
 
-              <Link href={`/retreats/${retreat.id}/book`} className="btn-primary w-full text-center inline-flex items-center justify-center gap-2">
-                Book Your Place
-              </Link>
-              <p className="text-xs text-text-light text-center mt-3">Secure checkout via Square</p>
+              {user && userData?.registeredRetreats?.includes(retreat.id) ? (
+                <Link href="/dashboard" className="btn-primary w-full text-center block mb-2 bg-green-700 hover:bg-green-800 border-none">
+                  Already Registered
+                </Link>
+              ) : (
+                <button 
+                  onClick={() => {
+                    if (!user) {
+                      toast.error('Please log in to book your place');
+                      router.push(`/login?returnTo=/retreats/${retreat.id}`);
+                      return;
+                    }
+                    setShowBookingModal(true);
+                  }}
+                  className="btn-primary w-full text-center inline-flex items-center justify-center gap-2"
+                >
+                  Book Your Place
+                </button>
+              )}
+              <p className="text-xs text-text-light text-center mt-3">Secure checkout via Square or PayPal</p>
             </div>
           </aside>
         </div>
@@ -282,6 +305,22 @@ export default function RetreatDetailPage() {
           items={galleryImages.map((url, i) => ({ id: String(i), url, type: 'image' as const, title: retreat.title, location: retreat.location })) as GalleryItem[]}
           initialIndex={galleryIndex}
           onClose={() => setGalleryIndex(null)}
+        />
+      )}
+
+      {showBookingModal && retreat && (
+        <BookingModal
+          retreat={retreat}
+          user={user}
+          userData={userData}
+          onClose={() => setShowBookingModal(false)}
+          onSuccess={async () => {
+            await refreshUserData();
+            setShowBookingModal(false);
+            toast.success('Booking confirmed!');
+            router.push('/dashboard');
+          }}
+          hideDetailLink={true}
         />
       )}
     </div>

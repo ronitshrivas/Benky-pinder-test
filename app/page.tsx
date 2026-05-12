@@ -356,10 +356,10 @@ export default function HomePage() {
 
 Days unfold with morning yoga, meditation, and countryside walks. Joyful experiences await from the vineyards and Chateau of Saint-Émilion, the golden light and medieval villages of the Dordogne, the coastal charm of Cap Ferret to the elegant architecture and fresh seafood of Bordeaux-the City of Wine-this sensory retreat is woven around celebrating life! Evenings bring sunset apéritifs and delicious French fare at the farmhouse table, shared with a small group of women. I hope you can join me for a soul enriching feast for the senses.
               </p>
-              <p>
+              {/* <p>
                 {featuredRetreat?.paymentNote ||
                   'Days unfold with morning yoga, meditation, countryside walks, sunset apéritifs, delicious French fare, and a small intimate group of women gathered around the farmhouse table.'}
-              </p>
+              </p> */}
             </div>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link href={featuredRetreat ? `/retreats/${featuredRetreat.id}` : '/retreats'} className="btn-navy inline-flex items-center gap-2">

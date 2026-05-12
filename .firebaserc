@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "manishpokharel-2fd2d"
-  }
+    "default": "beckypinder-bcb30",
+    "production": "beckypinder-bcb30"
+  },
+  "targets": {},
+  "etags": {}
 }

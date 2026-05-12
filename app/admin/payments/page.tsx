@@ -122,6 +122,7 @@ export default function AdminPaymentsPage() {
                   <th className="text-left px-6 py-4 text-xs font-semibold text-text-light uppercase">Date</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-text-light uppercase">Amount</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-text-light uppercase">Status</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-text-light uppercase">Note</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-text-light uppercase">Invoice</th>
                 </tr>
               </thead>
@@ -149,6 +150,15 @@ export default function AdminPaymentsPage() {
                           order.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                           'bg-red-100 text-red-700'
                         }`}>{order.status}</span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-text-light">
+                        {order.paymentLabel && (
+                          <span className={`px-2 py-1 rounded-full ${
+                            order.paymentLabel === 'Deposit' ? 'bg-amber-50 text-amber-700 border border-amber-100' : 'bg-green-50 text-green-700 border border-green-100'
+                          }`}>
+                            {order.paymentLabel}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         {order.invoiceUrl && (

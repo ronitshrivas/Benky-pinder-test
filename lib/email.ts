@@ -49,6 +49,7 @@ type InvoiceEmailPayload = {
   orderId?: string;
   receiptUrl?: string;
   type: 'course' | 'retreat' | 'admin_notification';
+  paymentLabel?: string;
   courseAccessUrl?: string;
 };
 
@@ -97,6 +98,7 @@ export async function sendInvoiceEmail(
     orderId,
     receiptUrl,
     type: resolvedType,
+    paymentLabel: resolvedPaymentLabel,
     courseAccessUrl: resolvedCourseAccessUrl,
   } = payload;
 
@@ -118,6 +120,7 @@ export async function sendInvoiceEmail(
           <table style="width: 100%; border-collapse: collapse;">
             <tr><td style="padding: 8px 0; color: #6B7280;">Item:</td><td style="padding: 8px 0; font-weight: 600;">${resolvedItemTitle}</td></tr>
             <tr><td style="padding: 8px 0; color: #6B7280;">Type:</td><td style="padding: 8px 0;">${resolvedType === 'course' ? 'Online Course' : resolvedType === 'retreat' ? 'Retreat Booking' : 'Admin Notification'}</td></tr>
+            ${resolvedPaymentLabel ? `<tr><td style="padding: 8px 0; color: #6B7280;">Option:</td><td style="padding: 8px 0;">${resolvedPaymentLabel}</td></tr>` : ''}
             <tr><td style="padding: 8px 0; color: #6B7280;">Amount:</td><td style="padding: 8px 0; font-weight: 600; color: #C9A84C;">${currencySymbol}${resolvedAmount.toFixed(2)}</td></tr>
             <tr><td style="padding: 8px 0; color: #6B7280;">Payment ID:</td><td style="padding: 8px 0; font-size: 12px;">${paymentReference}</td></tr>
             <tr><td style="padding: 8px 0; color: #6B7280;">Date:</td><td style="padding: 8px 0;">${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
@@ -132,7 +135,11 @@ export async function sendInvoiceEmail(
           </div>
         ` : ''}
         ${resolvedType === 'retreat' ? `
-          <p>I'll be in touch shortly with more details about the retreat. If you have any questions, please don't hesitate to reach out.</p>
+          <p>${resolvedPaymentLabel === 'Deposit' 
+            ? "Your deposit has been received and your spot is secured! I'll be in touch shortly with more details and instructions for paying the remaining balance." 
+            : "Your full payment has been received and your spot is confirmed! I'll be in touch shortly with more details about the retreat."
+          }</p>
+          <p>If you have any questions in the meantime, please don't hesitate to reach out.</p>
         ` : ''}
         <p style="margin-top: 30px;">With love and light,<br><strong>Becky Pinder</strong></p>
       </div>

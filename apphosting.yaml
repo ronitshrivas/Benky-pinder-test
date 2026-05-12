@@ -5,37 +5,37 @@ runConfig:
 
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "AIzaSyAc3dCkDdpjhobU3GL0Rj23zf8vYGTPCGM"
+    value: "AIzaSyDN-9fzzw9deCv8XxgBtmlVG1MOxN0fhkA"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "manishpokharel-2fd2d.firebaseapp.com"
+    value: "beckypinder-bcb30.firebaseapp.com"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "manishpokharel-2fd2d"
+    value: "beckypinder-bcb30"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "manishpokharel-2fd2d.firebasestorage.app"
+    value: "beckypinder-bcb30.firebasestorage.app"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "864064987730"
+    value: "659065020849"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:864064987730:web:1dc79851814c3b8efc358b"
+    value: "1:659065020849:web:ba1631b9a51e2f654f5d90"
     availability:
       - BUILD
       - RUNTIME
@@ -58,6 +58,19 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: NEXT_PUBLIC_PAYPAL_CLIENT_ID
+    value: "ATYkWk-78d5g1MYT_6HCzuRuERWiAueP5ufNLY0H8b02_Hc0v9_0bmFwMOTn28eIF2YfgbL\
+      WQ8VYw6wO"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PAYPAL_ENVIRONMENT
+    value: "sandbox"
+    availability:
+      - BUILD
+      - RUNTIME
+
   - variable: EMAIL_HOST
     value: "smtp.gmail.com"
     availability:
@@ -71,29 +84,25 @@ env:
       - RUNTIME
 
   - variable: EMAIL_USER
-    value: "prajwalsubedi05@gmail.com"
+    value: "pinderbecky7@gmail.com"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: EMAIL_FROM
-    value: "Becky Pinder Yoga <prajwalsubedi05@gmail.com>"
+    value: "Becky Pinder Yoga <pinderbecky7@gmail.com>"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: ADMIN_EMAIL
-    value: "prajwalsubedi05@gmail.com"
+    value: "pinderbecky7@gmail.com"
     availability:
       - BUILD
       - RUNTIME
-
   - variable: SQUARE_ACCESS_TOKEN
     secret: squareAccessToken
-    availability:
-      - RUNTIME
-
+  - variable: PAYPAL_CLIENT_SECRET
+    secret: paypalClientSecret
   - variable: EMAIL_PASSWORD
     secret: emailPassword
-    availability:
-      - RUNTIME

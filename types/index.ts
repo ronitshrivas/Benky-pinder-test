@@ -151,6 +151,7 @@ export interface Payment {
   squareOrderId?: string;
   invoiceSent: boolean;
   invoiceUrl?: string;
+  paymentLabel?: string;
   createdAt: string;
 }
 

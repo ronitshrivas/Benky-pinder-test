@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { MapPin, Calendar, Check } from 'lucide-react';
 import { getRetreats } from '@/lib/firestore';
 import { Retreat, GalleryItem } from '@/types';
 import { formatPrice, formatDate } from '@/lib/utils';
 import { GalleryViewer } from '@/components/ui/GalleryViewer';
+import { BookingModal } from '@/components/ui/BookingModal';
+import { useAuth } from '@/lib/auth-context';
+import toast from 'react-hot-toast';
 
 const retreatsMobileHeroImage = '/images/img18.jpeg';
 const retreatsDesktopHeroImage = '/images/img17.jpeg';
@@ -17,6 +21,10 @@ export default function RetreatsPage() {
   const [loading, setLoading] = useState(true);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[] | null>(null);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+  const [selectedRetreat, setSelectedRetreat] = useState<Retreat | null>(null);
+
+  const { user, userData, refreshUserData } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     let active = true;
@@ -67,6 +75,22 @@ export default function RetreatsPage() {
       })),
     );
     setGalleryIndex(startIndex);
+  };
+
+  const handleBookClick = (retreat: Retreat) => {
+    if (!user) {
+      toast.error('Please log in to book your place');
+      router.push(`/login?returnTo=/retreats`);
+      return;
+    }
+    setSelectedRetreat(retreat);
+  };
+
+  const handleBookingSuccess = async (orderId: string) => {
+    await refreshUserData();
+    setSelectedRetreat(null);
+    toast.success('Booking confirmed!');
+    router.push('/dashboard');
   };
 
   return (
@@ -190,13 +214,22 @@ export default function RetreatsPage() {
                     <div className="flex items-end justify-between mb-4">
                       <div>
                         {/* <span className="text-text-light text-sm">From</span> */}
-                        <div className="text-accent font-serif text-3xl">{formatPrice(retreat.price, retreat.currency || 'USD')}</div>
+                        <div className="text-accent font-serif text-3xl">{formatPrice(retreat.price, retreat.currency || 'AUD')}</div>
                         <span className="text-text-light text-xs">per person, all inclusive</span>
                       </div>
                     </div>
-                    <Link href={`/retreats/${retreat.id}`} className="btn-primary w-full text-center block">
-                      Book Your Place
-                    </Link>
+                    {user && userData?.registeredRetreats?.includes(retreat.id) ? (
+                      <Link href="/dashboard" className="btn-primary w-full text-center block mb-2 bg-green-700 hover:bg-green-800 border-none">
+                        Already Registered
+                      </Link>
+                    ) : (
+                      <button 
+                        onClick={() => handleBookClick(retreat)}
+                        className="btn-primary w-full text-center block mb-2"
+                      >
+                        Book Your Place
+                      </button>
+                    )}
 
                     <hr className="my-2" />
                      <Link href={`/contact`} className="btn-primary w-full text-center block">
@@ -221,6 +254,16 @@ export default function RetreatsPage() {
             setGalleryItems(null);
             setGalleryIndex(null);
           }}
+        />
+      )}
+
+      {selectedRetreat && (
+        <BookingModal
+          retreat={selectedRetreat}
+          user={user}
+          userData={userData}
+          onClose={() => setSelectedRetreat(null)}
+          onSuccess={handleBookingSuccess}
         />
       )}
 

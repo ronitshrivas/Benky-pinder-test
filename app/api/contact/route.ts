@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { sendEmail } from '@/lib/email';
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://beckypinder.com.au';
+const logoUrl = `${appUrl}/images/logo.png`;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -26,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Send notification email to Becky
     await sendEmail({
-      to: process.env.ADMIN_EMAIL || 'becky@beckypinder.com',
+      to: process.env.ADMIN_EMAIL || 'becky@beckypinder.com.au',
       subject: `New Inquiry: ${subject || 'General'} from ${name}`,
       html: `
         <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -43,7 +46,7 @@ export async function POST(req: NextRequest) {
             <p style="white-space: pre-wrap;">${message}</p>
           </div>
           <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
-            <p>This inquiry was submitted via beckypinder.com</p>
+            <p>This inquiry was submitted via beckypinder.com.au</p>
           </div>
         </div>
       `,
@@ -55,15 +58,14 @@ export async function POST(req: NextRequest) {
       subject: 'Thank you for your inquiry — Becky Pinder Yoga',
       html: `
         <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: #0D1B2A; padding: 20px; text-align: center;">
-            <h1 style="color: #D4AF37; font-size: 24px; margin: 0;">Becky Pinder</h1>
-            <p style="color: #fff; font-size: 12px; margin-top: 5px;">Yoga & Wellness</p>
+          <div style="background: #0D1B2A; padding: 25px; text-align: center;">
+            <img src="${logoUrl}" alt="Becky Pinder Logo" style="max-height: 70px; max-width: 220px; display: inline-block; vertical-align: middle;" />
           </div>
           <div style="padding: 30px; background: #fff; border: 1px solid #eee;">
-            <p>Dear ${name},</p>
+            <p>Hi ${name},</p>
             <p>Thank you for reaching out. I've received your message and will get back to you within 24-48 hours.</p>
-            <p>In the meantime, feel free to explore my <a href="https://beckypinder.com/courses" style="color: #D4AF37;">online courses</a> or upcoming <a href="https://beckypinder.com/retreats" style="color: #D4AF37;">retreats</a>.</p>
-            <p style="margin-top: 20px;">With love & light,<br/><strong>Becky</strong></p>
+            <p>In the meantime, feel free to explore my <a href="https://beckypinder.com.au/courses" style="color: #D4AF37;">online courses</a> or upcoming <a href="https://beckypinder.com.au/retreats" style="color: #D4AF37;">retreats</a>.</p>
+            <p style="margin-top: 20px;">Warm wishes,<br/><strong>Becky</strong></p>
           </div>
         </div>
       `,

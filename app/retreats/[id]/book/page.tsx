@@ -134,7 +134,7 @@ export default function RetreatBookingPage() {
             <div className="text-right">
               <p className="text-text-light text-sm">Total due</p>
               <div className="font-serif text-3xl text-accent">
-                {formatPrice(retreatAmount, retreat.currency || 'AUD')}
+                {formatPrice(retreatAmount, retreat?.currency || 'AUD')}
               </div>
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function RetreatBookingPage() {
           {user && (
             <PaymentForm
               amount={retreatAmount}
-              currency={retreat.currency || 'AUD'}
+              currency={retreat?.currency || 'AUD'}
               userId={user.uid}
               userEmail={user.email!}
               userName={userData?.displayName || user.displayName || 'Guest'}

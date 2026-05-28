@@ -143,7 +143,7 @@ export default function AdminPaymentsPage() {
                         <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded capitalize">{order.type}</span>
                       </td>
                       <td className="px-6 py-4 text-sm text-text-light">{formatDate(order.createdAt)}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-accent">{formatPrice(order.amount, 'AUD')}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-accent">{formatPrice(order.amount, 'USD')}</td>
                       <td className="px-6 py-4">
                         <span className={`text-xs px-2 py-1 rounded ${
                           order.status === 'completed' ? 'bg-green-100 text-green-700' :

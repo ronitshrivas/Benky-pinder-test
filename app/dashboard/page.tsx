@@ -136,7 +136,7 @@ export default function DashboardPage() {
                         alt={purchase.itemTitle}
                         fill
                         sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw"
-                        className="object-cover object-[50%_30%] sm:object-[50%_28%] scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
+                        className="object-cover scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
                       />
                       <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
                         <Play className="w-12 h-12 text-accent" />
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                           <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded capitalize">{order.type}</span>
                         </td>
                         <td className="px-6 py-4 text-sm text-text-light">{formatDate(order.createdAt)}</td>
-                        <td className="px-6 py-4 text-sm font-medium text-accent">{formatPrice(order.amount, 'AUD')}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-accent">{formatPrice(order.amount, 'USD')}</td>
                         <td className="px-6 py-4">
                           <span className={`text-xs px-2 py-1 rounded ${
                             order.status === 'completed' ? 'bg-green-100 text-green-700' :

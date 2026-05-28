@@ -310,3 +310,27 @@ If App Hosting still serves stale config after a change:
 8. Run `firebase deploy`.
 9. Set the first admin user in Firestore.
 10. Rotate any credentials that were exposed anywhere else.
+
+
+
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDN-9fzzw9deCv8XxgBtmlVG1MOxN0fhkA",
+  authDomain: "beckypinder-bcb30.firebaseapp.com",
+  projectId: "beckypinder-bcb30",
+  storageBucket: "beckypinder-bcb30.firebasestorage.app",
+  messagingSenderId: "659065020849",
+  appId: "1:659065020849:web:ba1631b9a51e2f654f5d90",
+  measurementId: "G-5GR7TS40PV"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);

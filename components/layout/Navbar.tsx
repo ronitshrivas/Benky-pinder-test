@@ -55,9 +55,9 @@ export default function Navbar() {
             <Image
               src="/images/logo.png"
               alt="Becky Pinder"
-              width={290}
+              width={300}
               height={112}
-              className="h-[6rem] w-auto sm:h-[5.75rem]"
+              className="h-[8rem] w-auto sm:h-[8rem]"
               priority
             />
           </Link>
@@ -67,9 +67,8 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className={`font-sans text-sm uppercase tracking-[0.22em] transition-colors duration-300 ${
-                  pathname === link.href ? 'text-accent' : 'text-primary-pale/90 hover:text-accent'
-                }`}
+                className={`font-sans text-sm uppercase tracking-[0.22em] transition-colors duration-300 ${pathname === link.href ? 'text-accent' : 'text-primary-pale/90 hover:text-accent'
+                  }`}
               >
                 {link.label}
               </Link>

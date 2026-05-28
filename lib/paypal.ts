@@ -5,10 +5,13 @@
  * All secrets stay on the server — never exposed to the browser.
  */
 
+const PAYPAL_ENV = process.env.PAYPAL_ENVIRONMENT || 'sandbox';
 const BASE_URL =
-  process.env.PAYPAL_ENVIRONMENT === 'production'
+  PAYPAL_ENV === 'production'
     ? 'https://api-m.paypal.com'
     : 'https://api-m.sandbox.paypal.com';
+
+console.log(`[PayPal] Initialized in ${PAYPAL_ENV} mode`);
 
 /** Fetch a short-lived OAuth 2.0 access token */
 async function getAccessToken(): Promise<string> {
@@ -122,6 +125,6 @@ export async function capturePayPalOrder(orderId: string): Promise<{
     payerEmail: json.payer?.email_address ?? '',
     status: json.status ?? 'COMPLETED',
     amount: capture?.amount?.value ?? '0',
-    currency: capture?.amount?.currency_code ?? 'AUD',
+    currency: capture?.amount?.currency_code ?? 'USD',
   };
 }

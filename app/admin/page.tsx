@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Users, BookOpen, Image as ImageIcon, Receipt, TrendingUp, DollarSign, Eye, MapPin } from 'lucide-react';
+import { Users, BookOpen, Image as ImageIcon, Receipt, TrendingUp, DollarSign, Eye, MapPin, FileText, Video } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getAdminStats } from '@/lib/firestore';
 
@@ -43,9 +43,12 @@ export default function AdminDashboard() {
     { href: '/admin/courses', label: 'Manage Courses', icon: BookOpen, desc: 'Add, edit, delete video courses' },
     { href: '/admin/retreats', label: 'Manage Retreats', icon: MapPin, desc: 'Manage retreat listings' },
     { href: '/admin/gallery', label: 'Gallery', icon: ImageIcon, desc: 'Manage photos & videos' },
+    { href: '/admin/becky', label: 'About Becky', icon: FileText, desc: 'Edit Becky page copy & philosophy' },
     { href: '/admin/payments', label: 'Payments', icon: Receipt, desc: 'View payment history' },
     { href: '/admin/users', label: 'Users', icon: Users, desc: 'Manage user accounts' },
     { href: '/admin/blog', label: 'Blog', icon: TrendingUp, desc: 'Manage blog posts' },
+    { href: '/admin/inquiries', label: 'Inquiries', icon: Eye, desc: 'View contact form submissions' },
+    { href: '/admin/inner-circle', label: 'Inner Circle Video', icon: Video, desc: 'Complimentary video for subscribers' },
   ];
 
   return (

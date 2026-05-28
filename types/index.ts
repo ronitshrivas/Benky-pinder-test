@@ -71,10 +71,6 @@ export interface Retreat {
   endDate: string;
   price: number;
   currency: string;
-  spotsTotal: number;
-  spotsRemaining: number;
-  maxSpots: number;
-  spotsLeft: number;
   thumbnailUrl: string;
   thumbnail: string;
   galleryImages: string[];
@@ -179,6 +175,16 @@ export interface Subscriber {
   email: string;
   subscribedAt: string;
   active: boolean;
+  accessToken: string;       // magic-link token — never expires
+  hasWatched: boolean;       // true once the guest opens the watch page
+}
+
+export interface ComplimentaryVideo {
+  videoUrl: string;          // YouTube/Vimeo embed or direct URL
+  title: string;
+  description: string;
+  published: boolean;
+  updatedAt: string;
 }
 
 export interface OTPRecord {
@@ -196,4 +202,8 @@ export interface DashboardStats {
   totalPayments: number;
   recentPayments: Payment[];
   monthlyRevenue: { month: string; amount: number }[];
+}
+
+export interface BeckyPageContent {
+  bioContent: string;
 }

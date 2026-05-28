@@ -102,7 +102,6 @@ export default function RetreatDetailPage() {
 
   const galleryImages = (retreat.images?.length ? retreat.images : retreat.galleryImages || []).filter(Boolean);
   const mainImage = retreat.thumbnailUrl || retreat.thumbnail || galleryImages[0] || '/images/retreat.jpg';
-  const showSpotsRemaining = typeof retreat.spotsRemaining === 'number' && retreat.spotsRemaining > 0;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -120,9 +119,6 @@ export default function RetreatDetailPage() {
               <div className="flex flex-wrap gap-4 text-white/80 text-sm">
                 <span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4 text-accent" /> {retreat.location}</span>
                 <span className="inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-accent" /> {formatDate(retreat.startDate)} - {formatDate(retreat.endDate)}</span>
-                {showSpotsRemaining ? (
-                  <span className="inline-flex items-center gap-2"><Users className="w-4 h-4 text-accent" /> {retreat.spotsRemaining} spots left</span>
-                ) : null}
               </div>
             </div>
           </div>
@@ -134,7 +130,7 @@ export default function RetreatDetailPage() {
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="font-serif text-2xl text-primary mb-4">About this retreat</h2>
-              <p className="text-text-light leading-relaxed">{retreat.longDescription || retreat.description}</p>
+              <p className="text-text-light leading-relaxed whitespace-pre-line">{retreat.longDescription || retreat.description}</p>
             </div>
 
             {retreat.earlyBirdOffer || retreat.paymentNote || retreat.depositNote ? (
@@ -173,35 +169,11 @@ export default function RetreatDetailPage() {
               </div>
             ) : null}
 
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="font-serif text-2xl text-primary mb-4">Gallery</h2>
-              {galleryImages.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {galleryImages.map((image, index) => (
-                    <button
-                      key={`${image}-${index}`}
-                      onClick={() => setGalleryIndex(index)}
-                      className="relative h-40 md:h-52 rounded-lg overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    >
-                      <Image
-                        src={image}
-                        alt={`${retreat.title} gallery ${index + 1}`}
-                        fill
-                        sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, 25vw"
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-text-light">More retreat images will appear here once uploaded.</p>
-              )}
-            </div>
+
 
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="font-serif text-2xl text-primary mb-4">What&apos;s included</h2>
-              <ul className="grid md:grid-cols-2 gap-3">
+              <ul className="grid grid-cols-1 gap-3">
                 {(retreat.inclusions || []).map((item) => (
                   <li key={item} className="flex items-start gap-2 text-text-light text-sm">
                     <Check className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
@@ -281,14 +253,7 @@ export default function RetreatDetailPage() {
                 </Link>
               ) : (
                 <button 
-                  onClick={() => {
-                    if (!user) {
-                      toast.error('Please log in to book your place');
-                      router.push(`/login?returnTo=/retreats/${retreat.id}`);
-                      return;
-                    }
-                    setShowBookingModal(true);
-                  }}
+                  onClick={() => setShowBookingModal(true)}
                   className="btn-primary w-full text-center inline-flex items-center justify-center gap-2"
                 >
                   Book Your Place
@@ -298,6 +263,33 @@ export default function RetreatDetailPage() {
             </div>
           </aside>
         </div>
+
+        {/* Gallery Section - Full Width below the main content */}
+        {galleryImages.length > 0 && (
+          <div className="max-w-7xl mx-auto px-4 mt-16 pb-20">
+            <h2 className="font-serif text-3xl text-primary mb-8 text-center">Gallery</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {galleryImages.map((image, index) => (
+                <button
+                  key={`${image}-${index}`}
+                  onClick={() => setGalleryIndex(index)}
+                  className="relative aspect-video rounded-xl overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent bg-primary/5 p-1 shadow-sm transition-all hover:shadow-md"
+                >
+                  <div className="relative h-full w-full overflow-hidden rounded-lg">
+                    <Image
+                      src={image}
+                      alt={`${retreat.title} gallery ${index + 1}`}
+                      fill
+                      sizes="(max-width: 767px) 100vw, 50vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {galleryIndex !== null && galleryImages.length > 0 && (

@@ -18,9 +18,12 @@ interface BookingModalProps {
 }
 
 export function BookingModal({ retreat, user, userData, onClose, onSuccess, hideDetailLink }: BookingModalProps) {
-  const [step, setStep] = useState<'selection' | 'payment'>('selection');
+  const [step, setStep] = useState<'selection' | 'guest-info' | 'payment'>('selection');
   const [paymentType, setPaymentType] = useState<'full' | 'deposit'>('full');
   const [mounted, setMounted] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestError, setGuestError] = useState('');
 
   useEffect(() => {
     setMounted(true);
@@ -37,7 +40,26 @@ export function BookingModal({ retreat, user, userData, onClose, onSuccess, hide
   const mainImage = retreat.thumbnailUrl || retreat.thumbnail || retreat.images?.[0] || '/images/retreat.jpg';
 
   const handleSelection = (type: 'full' | 'deposit') => {
+    setGuestError('');
     setPaymentType(type);
+    if (!user) {
+      setStep('guest-info');
+    } else {
+      setStep('payment');
+    }
+  };
+
+  const handleGuestInfoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guestName.trim() || !guestEmail.trim()) {
+      setGuestError('Please provide your name and email to continue.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail)) {
+      setGuestError('Please provide a valid email address.');
+      return;
+    }
+    setGuestError('');
     setStep('payment');
   };
 
@@ -57,11 +79,17 @@ export function BookingModal({ retreat, user, userData, onClose, onSuccess, hide
           </button>
           
           <div className="flex items-center gap-4">
-            {step === 'payment' && (
+            {(step === 'payment' || step === 'guest-info') && (
               <button 
-                onClick={() => setStep('selection')}
+                onClick={() => {
+                  if (step === 'payment' && !user) {
+                    setStep('guest-info');
+                  } else {
+                    setStep('selection');
+                  }
+                }}
                 className="p-2 -ml-2 rounded-full hover:bg-white/10 transition-colors"
-                aria-label="Back to selection"
+                aria-label="Go back"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -89,7 +117,7 @@ export function BookingModal({ retreat, user, userData, onClose, onSuccess, hide
                       <Check className="w-4 h-4" />
                     </span>
                   </div>
-                  <div className="font-serif text-3xl text-primary mb-1">{formatPrice(retreat.price, retreat.currency || 'AUD')}</div>
+                  <div className="font-serif text-3xl text-primary mb-1">{formatPrice(retreat.price, 'USD')}</div>
                   <p className="text-sm text-text-light">All-inclusive package</p>
                   <div className="mt-4 pt-4 border-t border-gray-100 w-full text-xs text-text-light">
                     Immediate confirmation
@@ -108,7 +136,7 @@ export function BookingModal({ retreat, user, userData, onClose, onSuccess, hide
                         <CreditCard className="w-4 h-4" />
                       </span>
                     </div>
-                    <div className="font-serif text-3xl text-primary mb-1">{formatPrice(retreat.depositAmount, retreat.currency || 'AUD')}</div>
+                    <div className="font-serif text-3xl text-primary mb-1">{formatPrice(retreat.depositAmount, 'USD')}</div>
                     <p className="text-sm text-text-light">Secure your spot today</p>
                     <div className="mt-4 pt-4 border-t border-gray-100 w-full text-xs text-text-light">
                       {retreat.balanceDueDate ? `Balance due by ${formatDate(retreat.balanceDueDate)}` : 'Balance due later'}
@@ -144,6 +172,51 @@ export function BookingModal({ retreat, user, userData, onClose, onSuccess, hide
                 </div>
               )}
             </div>
+          ) : step === 'guest-info' ? (
+            <form onSubmit={handleGuestInfoSubmit} className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+              <div>
+                <h3 className="font-serif text-2xl text-primary mb-2">Guest Details</h3>
+                <p className="text-text-light">Please provide your details so we can send your booking confirmation and receipt.</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="guestName" className="text-xs font-semibold text-text-light uppercase tracking-wider">Full Name</label>
+                  <input
+                    id="guestName"
+                    type="text"
+                    required
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    placeholder="e.g. Jane Doe"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="guestEmail" className="text-xs font-semibold text-text-light uppercase tracking-wider">Email Address</label>
+                  <input
+                    id="guestEmail"
+                    type="email"
+                    required
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+                  />
+                </div>
+              </div>
+
+              {guestError && (
+                <p className="text-sm text-red-600">{guestError}</p>
+              )}
+
+              <button 
+                type="submit"
+                className="btn-primary w-full py-4 flex items-center justify-center gap-2"
+              >
+                Continue to Payment <ChevronRight className="w-4 h-4" />
+              </button>
+            </form>
           ) : (
             <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
@@ -156,17 +229,17 @@ export function BookingModal({ retreat, user, userData, onClose, onSuccess, hide
                 <div className="text-right">
                   <p className="text-text-light text-xs mb-1">Total due</p>
                   <div className="font-serif text-2xl text-accent">
-                    {formatPrice(retreatAmount, retreat.currency || 'AUD')}
+                    {formatPrice(retreatAmount, 'USD')}
                   </div>
                 </div>
               </div>
 
               <PaymentForm
                 amount={retreatAmount}
-                currency={retreat.currency || 'AUD'}
-                userId={user.uid}
-                userEmail={user.email!}
-                userName={userData?.displayName || user.displayName || 'Guest'}
+                currency="USD"
+                userId={user?.uid || `guest_${Date.now()}`}
+                userEmail={user?.email || guestEmail}
+                userName={userData?.displayName || user?.displayName || guestName || 'Guest'}
                 itemId={retreat.id}
                 itemTitle={retreat.title}
                 itemType="retreat"

@@ -11,9 +11,9 @@
  * All secrets live server-side.  The browser only touches public keys / order IDs.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useId } from 'react';
 import Script from 'next/script';
-import { PayPalButtons, usePayPalScriptReducer } from '@paypal/react-paypal-js';
+import { PayPalButtons, PayPalScriptProvider, usePayPalScriptReducer } from '@paypal/react-paypal-js';
 import { CreditCard, Loader2, Lock, ShieldCheck, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatPrice } from '@/lib/utils';
@@ -47,6 +47,8 @@ declare global {
 
 // ─── Square card sub-component ────────────────────────────────────────────────
 
+// ─── Square card sub-component ────────────────────────────────────────────────
+
 function SquareCardForm({
   amount,
   currency,
@@ -61,70 +63,103 @@ function SquareCardForm({
   paymentLabel,
   onSuccess,
   onError,
-}: PaymentFormProps) {
+  active,
+}: PaymentFormProps & { active: boolean }) {
   const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || '';
   const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '';
 
-  const [sdkLoaded, setSdkLoaded] = useState(false);
   const [ready, setReady] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [formError, setFormError] = useState('');
   const cardRef = useRef<any>(null);
   const cardInitRef = useRef(false);
-  const containerId = 'sq-card-container';
+  const uniqueId = useId();
+  const containerId = `sq-card-container-${uniqueId.replace(/:/g, '')}`;
 
-  const scriptSrc = appId.startsWith('sandbox-')
-    ? 'https://sandbox.web.squarecdn.com/v1/square.js'
-    : 'https://web.squarecdn.com/v1/square.js';
-
-  // Initialise Square card form once SDK is loaded
+  // Initialise Square card form once appId/locationId/window.Square are available
   useEffect(() => {
-    if (!sdkLoaded || !appId || !locationId || cardInitRef.current) return;
+    if (!appId || !locationId || cardInitRef.current) return;
     let mounted = true;
 
     async function initCard() {
       if (!window.Square) {
-        if (mounted) setFormError('Square SDK not loaded yet.');
         return;
       }
+      
+      // If we already started initializing, don't do it again
+      if (cardInitRef.current) return;
+
+      const el = document.getElementById(containerId);
+      if (!el) return;
+
       try {
-        setReady(false);
+        console.log('Initializing Square payments for container:', containerId);
         const payments = window.Square.payments(appId, locationId);
         const card = await payments.card();
+        
+        // Final check before attaching
+        if (!mounted || cardInitRef.current) {
+          card.destroy();
+          return;
+        }
+
+        console.log('Attaching Square card to DOM...');
         await card.attach(`#${containerId}`);
+        
         if (mounted) {
           cardRef.current = card;
           cardInitRef.current = true;
           setReady(true);
           setFormError('');
+          console.log('Square card form ready.');
+        } else {
+          card.destroy();
         }
       } catch (e: any) {
+        console.error('Square card init failed:', e);
         if (mounted) setFormError(e?.message || 'Could not load the Square payment form.');
       }
     }
 
-    initCard();
+    // Poll for window.Square and container existence
+    const interval = setInterval(() => {
+      if (window.Square && document.getElementById(containerId)) {
+        clearInterval(interval);
+        initCard();
+      }
+    }, 200);
+
     return () => {
+      clearInterval(interval);
       mounted = false;
-      cardRef.current?.destroy?.().catch(() => undefined);
-      cardRef.current = null;
-      cardInitRef.current = false;
-      setReady(false);
+      // We still don't destroy it on unmount if we want to keep it persistent,
+      // but since we are using unique IDs now, remounting (if it happens) 
+      // will create a new container and a new card instance.
+      // Actually, if it stays mounted (hidden), this effect won't re-run.
     };
-  }, [sdkLoaded, appId, locationId]);
+  }, [appId, locationId, containerId]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     if (!cardRef.current) {
-      setFormError('Payment form is not ready yet.');
+      setFormError('Payment form is not ready yet. Please try refreshing if this persists.');
       return;
     }
     try {
       setProcessing(true);
+      console.log('Tokenizing Square card...');
       const tokenResult = await cardRef.current.tokenize();
+      
       if (tokenResult.status !== 'OK' || !tokenResult.token) {
-        throw new Error('Card validation failed. Please check your details and try again.');
+        console.error('Square tokenization failed:', tokenResult);
+        let errorMsg = 'Card validation failed. Please check your details and try again.';
+        if (tokenResult.errors && tokenResult.errors.length > 0) {
+          // Extract more specific error message if available
+          errorMsg = tokenResult.errors.map((err: any) => err.message).join(' ');
+        }
+        throw new Error(errorMsg);
       }
 
       const res = await fetch('/api/payment', {
@@ -148,33 +183,35 @@ function SquareCardForm({
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Payment failed');
+      if (!res.ok) {
+        console.error('Square payment API error:', data);
+        throw new Error(data.error || 'The payment could not be processed.');
+      }
 
       toast.success('Payment successful!');
       onSuccess(data.orderId, data.receiptUrl);
     } catch (err: any) {
-      const msg = err?.message || 'Payment failed';
-      setFormError(msg);
-      onError(msg);
+      console.error('Square payment catch:', err);
+      const friendlyMsg = err.message || 'There was an issue processing your card. Please verify your details or try another payment method.';
+      setFormError(friendlyMsg);
+      onError(err.message || friendlyMsg);
     } finally {
       setProcessing(false);
     }
   };
 
   return (
-    <>
-      <Script src={scriptSrc} onLoad={() => setSdkLoaded(true)} />
-
+    <div className={active ? 'block' : 'hidden'}>
       <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label className="input-label mb-2 block">Card Details</label>
           <div
             id={containerId}
-            className="min-h-[220px] rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors focus-within:border-accent"
+            className="min-h-[120px] rounded-xl border border-gray-200 bg-gray-50/50 p-4 transition-colors focus-within:border-accent"
           />
         </div>
 
-        {!sdkLoaded && (
+        {!ready && !formError && (
           <div className="flex items-center gap-2 text-sm text-text-light">
             <Loader2 className="w-4 h-4 animate-spin text-accent" />
             Loading secure card form…
@@ -202,7 +239,7 @@ function SquareCardForm({
           {processing ? 'Processing…' : `Pay ${formatPrice(amount, currency)} with Card`}
         </button>
       </form>
-    </>
+    </div>
   );
 }
 
@@ -222,7 +259,8 @@ function PayPalForm({
   paymentLabel,
   onSuccess,
   onError,
-}: PaymentFormProps) {
+  active,
+}: PaymentFormProps & { active: boolean }) {
   const [{ isPending }] = usePayPalScriptReducer();
   const [ppError, setPpError] = useState('');
 
@@ -259,19 +297,23 @@ function PayPalForm({
         }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'PayPal payment failed');
+      if (!res.ok) {
+        console.error('PayPal capture API error:', result);
+        throw new Error(result.error || 'PayPal payment could not be finalized.');
+      }
 
       toast.success('PayPal payment successful!');
       onSuccess(result.orderId);
     } catch (err: any) {
-      const msg = err?.message || 'PayPal payment failed';
-      setPpError(msg);
-      onError(msg);
+      console.error('PayPal catch error:', err);
+      const friendlyMsg = 'PayPal payment could not be completed. Please try again or use a card.';
+      setPpError(friendlyMsg);
+      onError(err.message || friendlyMsg);
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className={active ? 'space-y-4' : 'hidden'}>
       {isPending && (
         <div className="flex items-center justify-center gap-2 py-6 text-sm text-text-light">
           <Loader2 className="w-5 h-5 animate-spin text-accent" />
@@ -315,9 +357,24 @@ type Tab = 'card' | 'paypal';
 
 export function PaymentForm(props: PaymentFormProps) {
   const [activeTab, setActiveTab] = useState<Tab>('card');
+  const [sdkLoaded, setSdkLoaded] = useState(false);
+  const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || '';
+  const paypalClientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '';
+  const paypalCurrency = (props.currency || 'AUD').toUpperCase();
+  const scriptSrc = appId.startsWith('sandbox-')
+    ? 'https://sandbox.web.squarecdn.com/v1/square.js'
+    : 'https://web.squarecdn.com/v1/square.js';
 
   return (
     <div className="space-y-6">
+      <Script 
+        src={scriptSrc} 
+        onLoad={() => {
+          console.log('Square SDK loaded.');
+          setSdkLoaded(true);
+        }} 
+      />
+
       {/* Security badge */}
       <div className="rounded-xl bg-surface-cream p-4 flex items-start gap-3">
         <ShieldCheck className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
@@ -360,13 +417,18 @@ export function PaymentForm(props: PaymentFormProps) {
         </button>
       </div>
 
-      {/* Tab panels */}
+      {/* Tab panels - Keep both mounted for speed */}
       <div>
-        {activeTab === 'card' ? (
-          <SquareCardForm {...props} />
-        ) : (
-          <PayPalForm {...props} />
-        )}
+        <SquareCardForm {...props} active={activeTab === 'card'} />
+        <PayPalScriptProvider
+          options={{
+            clientId: paypalClientId,
+            currency: paypalCurrency,
+            intent: 'capture',
+          }}
+        >
+          <PayPalForm {...props} active={activeTab === 'paypal'} />
+        </PayPalScriptProvider>
       </div>
     </div>
   );

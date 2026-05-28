@@ -78,11 +78,6 @@ export default function RetreatsPage() {
   };
 
   const handleBookClick = (retreat: Retreat) => {
-    if (!user) {
-      toast.error('Please log in to book your place');
-      router.push(`/login?returnTo=/retreats`);
-      return;
-    }
     setSelectedRetreat(retreat);
   };
 
@@ -113,10 +108,10 @@ export default function RetreatsPage() {
         />
         <div className="absolute inset-0 flex items-center justify-center text-center px-4">
           <div>
-            <p className="section-label text-accent mb-3">Soulful wellness retreats </p>
+            <p className="section-label text-accent mb-3 text-xl md:text-2xl">Soulful wellness retreats </p>
             <h1 className="font-serif text-4xl md:text-6xl text-white">Escape &amp; Transform</h1>
-            <p className="text-white/75 mt-4 max-w-xl mx-auto">
-             Intimate retreats designed for women that offer renewal, connection and joy.
+            <p className="text-white/75 mt-4 max-w-xl mx-auto text-xl md:text-2xl">
+              Intimate retreats designed for women that offer renewal, connection and joy.
             </p>
           </div>
         </div>
@@ -138,108 +133,119 @@ export default function RetreatsPage() {
             </div>
           ) : (
             retreats.map((retreat) => (
-              <div key={retreat.id} className="grid md:grid-cols-2 gap-12 items-start mb-20 last:mb-0">
-                {/* Image */}
-                <div className="relative rounded-lg overflow-hidden bg-primary/5 p-2">
+              <div key={retreat.id} className="mb-32 last:mb-0">
                   {(() => {
                     const retreatImages = [
                       ...(retreat.images || []),
                       ...(retreat.galleryImages || []),
                     ].filter((image, index, self) => Boolean(image) && self.indexOf(image) === index);
                     const imagesToShow = retreatImages.length > 0 ? retreatImages : [retreat.thumbnailUrl || retreat.thumbnail || '/images/retreat.jpg'];
+                    
+                    // We'll put the first 3 images in the left column next to the text
+                    const sideImages = imagesToShow.slice(0, 3);
+                    const bottomImages = imagesToShow.slice(3);
 
                     return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 auto-rows-[120px] sm:auto-rows-[140px]">
-                        {imagesToShow.map((image, index) => (
-                          <button
-                            key={`${retreat.id}-${image}-${index}`}
-                            type="button"
-                            onClick={() => openGallery(retreat, index)}
-                            className={`relative overflow-hidden rounded-md bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                              index === 0 ? 'col-span-2 row-span-2' : ''
-                            }`}
-                            aria-label={`Open ${retreat.title} gallery image ${index + 1}`}
-                          >
-                            <Image
-                              src={image}
-                              alt={`${retreat.title} image ${index + 1}`}
-                              fill
-                              sizes={index === 0 ? '(max-width: 767px) 100vw, 50vw' : '(max-width: 767px) 50vw, 16vw'}
-                              quality={75}
-                              priority={retreats[0]?.id === retreat.id && index === 0}
-                              loading={retreats[0]?.id === retreat.id && index === 0 ? 'eager' : 'lazy'}
-                              className="object-cover object-center transition-transform duration-500 hover:scale-105"
-                            />
-                          </button>
-                        ))}
-                      </div>
+                      <>
+                        <div className="grid md:grid-cols-2 gap-12 items-start mb-8">
+                          {/* Left Column: Image Stack */}
+                          <div className="flex flex-col gap-4">
+                            {sideImages.map((image, index) => (
+                              <button
+                                key={`${retreat.id}-side-${image}-${index}`}
+                                type="button"
+                                onClick={() => openGallery(retreat, index)}
+                                className="relative overflow-hidden rounded-lg bg-primary/5 aspect-video w-full group shadow-sm"
+                              >
+                                <Image
+                                  src={image}
+                                  alt={`${retreat.title} image ${index + 1}`}
+                                  fill
+                                  sizes="(max-width: 767px) 100vw, 50vw"
+                                  quality={80}
+                                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Right Column: Details */}
+                          <div className="bg-white/50 backdrop-blur-sm p-8 rounded-2xl border border-primary/5 shadow-sm">
+                            <p className="section-label">{retreat.subtitle || 'Retreat'}</p>
+                            <h2 className="font-serif text-3xl md:text-4xl text-primary mb-4">{retreat.title}</h2>
+
+                            <div className="flex flex-wrap gap-4 mb-6">
+                              <span className="flex items-center text-sm text-text-light">
+                                <MapPin className="w-4 h-4 text-accent mr-2" /> {retreat.location}
+                              </span>
+                              <span className="flex items-center text-sm text-text-light">
+                                <Calendar className="w-4 h-4 text-accent mr-2" /> {formatDate(retreat.startDate)} — {formatDate(retreat.endDate)}
+                              </span>
+                            </div>
+
+                            <p className="text-text-light leading-relaxed mb-6 whitespace-pre-line">{retreat.description}</p>
+
+                            <h4 className="font-serif text-lg text-primary mb-3">What&apos;s Included</h4>
+                            <ul className="space-y-2 mb-8">
+                              {(retreat.inclusions || []).map((item) => (
+                                <li key={item} className="flex items-start text-sm text-text-light">
+                                  <Check className="w-4 h-4 text-accent mr-2 mt-0.5 flex-shrink-0" />
+                                  {item}
+                                </li>
+                              ))}
+                            </ul>
+
+                            <div className="bg-surface-cream p-6 rounded-xl">
+                              <div className="flex items-end justify-between mb-4">
+                                <div className="text-accent font-serif text-3xl">{formatPrice(retreat.price, retreat.currency || 'AUD')}</div>
+                              </div>
+                              {user && userData?.registeredRetreats?.includes(retreat.id) ? (
+                                <Link href="/dashboard" className="btn-primary w-full text-center block mb-2 bg-green-700 hover:bg-green-800 border-none">
+                                  Already Registered
+                                </Link>
+                              ) : (
+                                <button
+                                  onClick={() => handleBookClick(retreat)}
+                                  className="btn-primary w-full text-center block mb-2"
+                                >
+                                  Book Your Place
+                                </button>
+                              )}
+                              <hr className="my-3 border-accent/20" />
+                              <Link href={`/contact`} className="btn-outline w-full text-center block text-xs">
+                                Register Interest
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottom Section: Remaining images in 2-column grid */}
+                        {bottomImages.length > 0 && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {bottomImages.map((image, index) => (
+                              <button
+                                key={`${retreat.id}-bottom-${image}-${index}`}
+                                type="button"
+                                onClick={() => openGallery(retreat, index + 3)}
+                                className="relative overflow-hidden rounded-lg bg-primary/5 aspect-video w-full group shadow-sm"
+                              >
+                                <Image
+                                  src={image}
+                                  alt={`${retreat.title} image ${index + 4}`}
+                                  fill
+                                  sizes="(max-width: 767px) 100vw, 50vw"
+                                  quality={80}
+                                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     );
                   })()}
-                  {typeof retreat.spotsRemaining === 'number' && retreat.spotsRemaining > 0 ? (
-                    <div className="absolute top-4 left-4 bg-accent text-primary px-4 py-2 text-sm font-semibold rounded">
-                      {retreat.spotsRemaining} spots remaining
-                    </div>
-                  ) : null}
-                </div>
-
-                {/* Details */}
-                <div>
-                  <p className="section-label">{retreat.subtitle || 'Retreat'}</p>
-                  <h2 className="font-serif text-3xl md:text-4xl text-primary mb-4">{retreat.title}</h2>
-
-                  <div className="flex flex-wrap gap-4 mb-6">
-                    <span className="flex items-center text-sm text-text-light">
-                      <MapPin className="w-4 h-4 text-accent mr-2" /> {retreat.location}
-                    </span>
-                    <span className="flex items-center text-sm text-text-light">
-                      <Calendar className="w-4 h-4 text-accent mr-2" /> {formatDate(retreat.startDate)} — {formatDate(retreat.endDate)}
-                    </span>
-                  </div>
-
-                  <p className="text-text-light leading-relaxed mb-6">{retreat.description}</p>
-
-                  {/* Inclusions */}
-                  <h4 className="font-serif text-lg text-primary mb-3">What&apos;s Included</h4>
-                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-8">
-                    {(retreat.inclusions || []).map((item) => (
-                      <li key={item} className="flex items-start text-sm text-text-light">
-                        <Check className="w-4 h-4 text-accent mr-2 mt-0.5 flex-shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {/* Price & CTA */}
-                  <div className="bg-surface-cream p-6 rounded-lg">
-                    <div className="flex items-end justify-between mb-4">
-                      <div>
-                        {/* <span className="text-text-light text-sm">From</span> */}
-                        <div className="text-accent font-serif text-3xl">{formatPrice(retreat.price, retreat.currency || 'AUD')}</div>
-                        <span className="text-text-light text-xs">per person, all inclusive</span>
-                      </div>
-                    </div>
-                    {user && userData?.registeredRetreats?.includes(retreat.id) ? (
-                      <Link href="/dashboard" className="btn-primary w-full text-center block mb-2 bg-green-700 hover:bg-green-800 border-none">
-                        Already Registered
-                      </Link>
-                    ) : (
-                      <button 
-                        onClick={() => handleBookClick(retreat)}
-                        className="btn-primary w-full text-center block mb-2"
-                      >
-                        Book Your Place
-                      </button>
-                    )}
-
-                    <hr className="my-2" />
-                     <Link href={`/contact`} className="btn-primary w-full text-center block">
-                      Register Interest
-                    </Link>
-                   
-                  </div>
-                  
-                   
-                </div>
               </div>
             ))
           )}

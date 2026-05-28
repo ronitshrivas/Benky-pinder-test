@@ -17,7 +17,7 @@ export default function AdminRetreatsPage() {
   const [editRetreat, setEditRetreat] = useState<Retreat | null>(null);
   const [form, setForm] = useState({
     title: '', subtitle: '', description: '', longDescription: '', location: '', startDate: '', endDate: '',
-    price: '', currency: 'AUD', maxSpots: '', spotsLeft: '',
+    price: '', currency: 'USD',
     inclusions: '', exclusions: '', highlights: '', experiences: '',
     earlyBirdOffer: '', paymentNote: '', depositNote: '', depositAmount: '', depositDueDate: '', balanceDueDate: '',
     featured: false,
@@ -78,8 +78,6 @@ export default function AdminRetreatsPage() {
         endDate: form.endDate,
         price: parseFloat(form.price) || 0,
         currency: form.currency,
-        maxSpots: parseInt(form.maxSpots) || 20,
-        spotsLeft: parseInt(form.spotsLeft) || parseInt(form.maxSpots) || 20,
         images,
         thumbnail: images[0] || '',
         inclusions: form.inclusions.split('\n').filter(Boolean),
@@ -135,7 +133,7 @@ export default function AdminRetreatsPage() {
       title: retreat.title, subtitle: retreat.subtitle || '', description: retreat.description, 
       longDescription: retreat.longDescription || '', location: retreat.location,
       startDate: retreat.startDate, endDate: retreat.endDate, price: retreat.price.toString(),
-      currency: retreat.currency, maxSpots: retreat.maxSpots.toString(), spotsLeft: retreat.spotsLeft.toString(),
+      currency: retreat.currency,
       inclusions: retreat.inclusions.join('\n'),
       exclusions: (retreat.exclusions || []).join('\n'),
       highlights: retreat.highlights.join('\n'),
@@ -164,9 +162,7 @@ export default function AdminRetreatsPage() {
       startDate: '',
       endDate: '',
       price: '',
-      currency: 'AUD',
-      maxSpots: '',
-      spotsLeft: '',
+      currency: 'USD',
       inclusions: '',
       exclusions: '',
       highlights: '',
@@ -221,7 +217,6 @@ export default function AdminRetreatsPage() {
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-text-light">
                     <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {retreat.location}</span>
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {retreat.startDate} - {retreat.endDate}</span>
-                    <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {retreat.spotsLeft}/{retreat.maxSpots} spots</span>
                   </div>
                   <div className="flex items-center justify-between mt-4 pt-4 border-t">
                     <span className="text-accent font-bold">${retreat.price}</span>
@@ -256,17 +251,15 @@ export default function AdminRetreatsPage() {
                 <div><label className="input-label">Start Date *</label><input type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="input-field" /></div>
                 <div><label className="input-label">End Date *</label><input type="date" required min={form.startDate || undefined} value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="input-field" /></div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div><label className="input-label">Price ($) *</label><input type="number" required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="input-field" /></div>
-                <div><label className="input-label">Max Spots</label><input type="number" value={form.maxSpots} onChange={(e) => setForm({ ...form, maxSpots: e.target.value })} className="input-field" /></div>
-                <div><label className="input-label">Spots Left</label><input type="number" value={form.spotsLeft} onChange={(e) => setForm({ ...form, spotsLeft: e.target.value })} className="input-field" /></div>
               </div>
               <div><label className="input-label">Inclusions (one per line)</label><textarea value={form.inclusions} onChange={(e) => setForm({ ...form, inclusions: e.target.value })} className="input-field resize-none" rows={3} placeholder="Daily yoga sessions&#10;Gourmet meals&#10;Spa treatments" /></div>
               <div><label className="input-label">Not Included (one per line)</label><textarea value={form.exclusions} onChange={(e) => setForm({ ...form, exclusions: e.target.value })} className="input-field resize-none" rows={3} placeholder="Airfares&#10;Lunches&#10;Travel insurance" /></div>
               <div><label className="input-label">Highlights (one per line)</label><textarea value={form.highlights} onChange={(e) => setForm({ ...form, highlights: e.target.value })} className="input-field resize-none" rows={3} placeholder="Beautiful countryside venue&#10;Small intimate group" /></div>
               <div><label className="input-label">Curated Experiences</label><textarea value={form.experiences} onChange={(e) => setForm({ ...form, experiences: e.target.value })} className="input-field resize-none" rows={6} placeholder="Saint-Émilion Wine Tour | Visit three renowned wineries with an expert guide.&#10;Rocamadour & Dordogne | Overnight stay in Rocamadour and explore Sarlat the next day." /></div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><label className="input-label">Early Bird Offer</label><textarea value={form.earlyBirdOffer} onChange={(e) => setForm({ ...form, earlyBirdOffer: e.target.value })} className="input-field resize-none" rows={4} placeholder="Early Bird Offer: $3,000 AUD..." /></div>
+                <div><label className="input-label">Early Bird Offer</label><textarea value={form.earlyBirdOffer} onChange={(e) => setForm({ ...form, earlyBirdOffer: e.target.value })} className="input-field resize-none" rows={4} placeholder="Early Bird Offer: $3,000 USD..." /></div>
                 <div><label className="input-label">Payment Note</label><textarea value={form.paymentNote} onChange={(e) => setForm({ ...form, paymentNote: e.target.value })} className="input-field resize-none" rows={4} placeholder="Secure your place with a 50% deposit..." /></div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

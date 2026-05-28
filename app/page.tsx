@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Leaf, Heart, Sun, Sparkles, Star } from 'lucide-react';
+import { Leaf, Heart, Sun, Sparkles, Star, Check } from 'lucide-react';
 import { getCourses, getRetreats } from '@/lib/firestore';
 import { formatDate, formatPrice } from '@/lib/utils';
 import { Course, Retreat } from '@/types';
@@ -85,25 +85,101 @@ const testimonials = [
     rating: 5,
     text: 'Love your teaching style Becky. You guide each of us to achieve the very best we can. Thank you.',
   },
-   {
+  {
     name: 'Stephanie',
     meta: '',
     rating: 5,
     text: 'Becky has the gift to inspire and educate with the wisdom of an old soul. I would  highly recommend anyone who wants to nurture their body and soul to attend one of her fantastic and rejuvenating retreats.',
   },
-   {
+  {
     name: 'Basha',
     meta: '',
     rating: 5,
     text: 'I love going to Becky’s classes. She is one of the best Yoga teachers I have been to over the years and I miss her very much. ',
   },
-   {
+  {
     name: 'Fiona',
     meta: '',
     rating: 5,
     text: 'I attended my first Yoga class ever in my mid 60’s. I thought what am I doing here with all these experienced people. I don’t belong. How wrong was I ! Becky made me feel so comfortable and welcome and gave me adjustments so I could participate in the class. I am astounded by the improvements I have made. Becky reminded me that you are never too old to learn something new. ',
   }
 ];
+
+function InnerCircleForm() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'already' | 'error'>('idle');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus('loading');
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (data.message === 'Already subscribed') {
+        setStatus('already');
+      } else if (data.success) {
+        setStatus('success');
+        setEmail('');
+      } else {
+        setStatus('error');
+      }
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  if (status === 'success') {
+    return (
+      <div className="mx-auto max-w-md bg-white/10 border border-white/20 rounded-lg px-8 py-6 text-center">
+        <p className="text-accent text-lg font-serif mb-1">🌿 Check your inbox!</p>
+        <p className="text-white/80 text-sm">
+          Your complimentary morning practice is on its way. Watch for an email from Becky.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === 'already') {
+    return (
+      <div className="mx-auto max-w-md bg-white/10 border border-white/20 rounded-lg px-8 py-6 text-center">
+        <p className="text-accent font-semibold mb-1">You're already in the Inner Circle 🌿</p>
+        <p className="text-white/70 text-sm">
+          Check your original welcome email for your personal video link.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto flex max-w-md overflow-hidden rounded shadow-2xl"
+    >
+      <input
+        type="email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Enter your email address"
+        className="flex-1 px-6 py-4 text-sm outline-none"
+      />
+      <button
+        type="submit"
+        disabled={status === 'loading'}
+        className="bg-primary-dark px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-black disabled:opacity-60"
+      >
+        {status === 'loading' ? '…' : 'Subscribe'}
+      </button>
+    </form>
+  );
+}
+
+
 
 export default function HomePage() {
   const [featuredRetreat, setFeaturedRetreat] = useState<Retreat | null>(null);
@@ -155,12 +231,6 @@ export default function HomePage() {
             className="hero-main-img absolute inset-0 h-full w-full"
           />
         </picture>
-        <Image
-          src="/images/texture.png"
-          alt=""
-          fill
-          className="pointer-events-none absolute inset-0 z-[2] opacity-40 mix-blend-overlay"
-        />
 
         {/* Desktop overlay */}
         <div
@@ -309,7 +379,7 @@ export default function HomePage() {
 
       {/* 3. Upcoming Retreat */}
 
-       <section className="relative h-[60vh] min-h-[400px]">
+      <section className="relative h-[60vh] min-h-[400px]">
         <picture className="absolute inset-0 block h-full w-full">
           <source media="(max-width: 767px)" srcSet={retreatsMobileHeroImage} />
           <img
@@ -329,7 +399,7 @@ export default function HomePage() {
             <p className="section-label text-accent text-2xl mb:text-2xl mb-3">Unique retreats</p>
             <h1 className="font-serif text-4xl md:text-6xl text-white">Escape &amp; Transform</h1>
             <p className="text-white/75 mt-4 max-w-xl mx-auto font-extrabold">
-             Soulful retreats and unique travel experiences for women.
+              Soulful retreats and unique travel experiences for women.
             </p>
           </div>
         </div>
@@ -340,7 +410,7 @@ export default function HomePage() {
             <span className="section-label text-2xl md:text-3xl">Upcoming Retreat</span>
             <div className="mx-auto mb-6 h-0.5 w-12 bg-accent" />
             <h2 className="section-title mb-3 text-primary">
-              {/* {featuredRetreat?.location || 'South West France'} */}‘Joie de Vivre’ 
+              {/* {featuredRetreat?.location || 'South West France'} */}‘Joie de Vivre’
             </h2>
             <h3 className="font-serif text-3xl text-primary/90 mb-4">
               {/* {featuredRetreat?.title || 'Joie de Vivre'} */}South West France
@@ -352,15 +422,29 @@ export default function HomePage() {
               <p>
                 {/* {featuredRetreat?.longDescription ||
                   "This September join me for some 'Joie de Vivre' - a Yoga and Wellness escape in South West France. Settle into the magic of early autumn at La Brousteleyre, a charming rural property in the region around St Emilion surrounded by vineyards and pristine parkland."} */}
-                  This September join me for a truly special week in the heart of South West France.  A retreat designed to nourish your body, uplift your spirit and fill you with a sense of pure Joie De Vivre! 
+                This September join me for a truly special week in the heart of South West France.  A retreat designed to nourish your body, uplift your spirit and fill you with a sense of pure Joie De Vivre!
 
-Days unfold with morning yoga, meditation, and countryside walks. Joyful experiences await from the vineyards and Chateau of Saint-Émilion, the golden light and medieval villages of the Dordogne, the coastal charm of Cap Ferret to the elegant architecture and fresh seafood of Bordeaux-the City of Wine-this sensory retreat is woven around celebrating life! Evenings bring sunset apéritifs and delicious French fare at the farmhouse table, shared with a small group of women. I hope you can join me for a soul enriching feast for the senses.
+                Days unfold with morning yoga, meditation, and countryside walks. Joyful experiences await from the vineyards and Chateau of Saint-Émilion, the golden light and medieval villages of the Dordogne, the coastal charm of Cap Ferret to the elegant architecture and fresh seafood of Bordeaux-the City of Wine-this sensory retreat is woven around celebrating life! Evenings bring sunset apéritifs and delicious French fare at the farmhouse table, shared with a small group of women. I hope you can join me for a soul enriching feast for the senses.
               </p>
               {/* <p>
                 {featuredRetreat?.paymentNote ||
                   'Days unfold with morning yoga, meditation, countryside walks, sunset apéritifs, delicious French fare, and a small intimate group of women gathered around the farmhouse table.'}
               </p> */}
             </div>
+
+            {/* {featuredRetreat?.inclusions && featuredRetreat.inclusions.length > 0 && (
+              <div className="mt-10 text-left max-w-lg mx-auto">
+                <h4 className="font-serif text-xl text-primary mb-4 text-center">What's Included</h4>
+                <ul className="grid grid-cols-1 gap-3">
+                  {featuredRetreat.inclusions.map((item) => (
+                    <li key={item} className="flex items-start text-sm text-text-light">
+                      <Check className="w-4 h-4 text-accent mr-3 mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )} */}
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link href={featuredRetreat ? `/retreats/${featuredRetreat.id}` : '/retreats'} className="btn-navy inline-flex items-center gap-2">
                 FIND OUT MORE
@@ -372,12 +456,12 @@ Days unfold with morning yoga, meditation, and countryside walks. Joyful experie
           </div>
         </div>
       </section>
-{/*  
+      {/*  
  //retreats page contener */}
- 
 
 
-    
+
+
 
       {/* 4. About Becky - Split Layout */}
       <section className="overflow-hidden">
@@ -417,7 +501,7 @@ Days unfold with morning yoga, meditation, and countryside walks. Joyful experie
           <div className="mb-16 text-center">
             <span className="section-label">Online Programs</span>
             <div className="mx-auto mb-6 h-0.5 w-12 bg-accent" />
-            <h2 className="section-title text-primary">Find Your Practice</h2>
+            <h2 className="section-title text-primary">Choose Your Practice</h2>
           </div>
 
           {isLoading ? (
@@ -450,7 +534,7 @@ Days unfold with morning yoga, meditation, and countryside walks. Joyful experie
                     </p>
                     <div className="flex items-center justify-between">
                       <span className="font-serif text-xl text-accent">
-                        {formatPrice(course.price, 'AUD')}
+                        {formatPrice(course.price, course.currency || 'AUD')}
                       </span>
                       <Link href={`/courses`} className="text-xs font-bold uppercase tracking-widest text-primary hover:text-accent">
                         View Course
@@ -544,22 +628,15 @@ Days unfold with morning yoga, meditation, and countryside walks. Joyful experie
           <span className="section-label !text-accent-light">Stay Connected</span>
           <h2 className="section-title mb-4 text-white">Join Becky's Inner Circle</h2>
           <p className="mb-10 text-white/80">
-          Recieve a complimentary 10 minute radiance boost  morning practice 
-Early access to retreats
-Delivered to your inbox
+            Recieve a complimentary 10 minute radiance boost  morning practice.<br />
+            Early access to retreats
+            Delivered to your inbox
           </p>
-          <form className="mx-auto flex max-w-md overflow-hidden rounded shadow-2xl" onSubmit={(e) => e.preventDefault()}>
-            <input
-              type="email"
-              placeholder="Enter your email address"
-              className="flex-1 px-6 py-4 text-sm outline-none"
-            />
-            <button className="bg-primary-dark px-8 py-4 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-black">
-              Subscribe
-            </button>
-          </form>
+
+          <InnerCircleForm />
         </div>
       </section>
+
 
       {/* 9. Final CTA Banner */}
       <section className="relative py-32 text-center">
@@ -574,7 +651,7 @@ Delivered to your inbox
           <span className="section-label !text-accent-light">Begin Today</span>
           <h2 className="section-title mb-6 text-white">I look forward to welcoming you.</h2>
           <p className="mx-auto mb-10 max-w-xl text-white/90">
-           Join a retreat, book a class or simply say hello
+            Join a retreat, book a class or simply say hello
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link href="/courses" className="btn-accent">

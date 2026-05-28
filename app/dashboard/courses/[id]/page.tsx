@@ -3,10 +3,33 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Play, CheckCircle, Lock, ChevronDown, ChevronUp } from 'lucide-react';
+import VideoPlayer from '@/components/ui/VideoPlayer';
 import { useAuth } from '@/lib/auth-context';
 import { getCourseById, updateLessonProgress } from '@/lib/firestore';
 import { Course, Lesson } from '@/types';
 import toast from 'react-hot-toast';
+
+function getPlayableLessonUrl(lesson: Lesson | null): string {
+  if (!lesson) return '';
+  const anyLesson = lesson as any;
+  const nestedVideoUrl = anyLesson.video && typeof anyLesson.video === 'object' ? anyLesson.video.url : '';
+  return (
+    lesson.videoUrl ||
+    anyLesson.videoURL ||
+    anyLesson.videoLink ||
+    anyLesson.lessonVideoUrl ||
+    anyLesson.lessonUrl ||
+    anyLesson.mediaUrl ||
+    anyLesson.fileUrl ||
+    anyLesson.url ||
+    nestedVideoUrl ||
+    anyLesson.video ||
+    anyLesson.src ||
+    anyLesson.playbackUrl ||
+    anyLesson.downloadUrl ||
+    ''
+  ).trim();
+}
 
 export default function CourseViewerPage() {
   const { id } = useParams();
@@ -27,11 +50,23 @@ export default function CourseViewerPage() {
       getCourseById(id as string).then((data) => {
         if (data) {
           setCourse(data);
-          if (data.lessons.length > 0) setCurrentLesson(data.lessons[0]);
         }
       });
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!course) return;
+    const firstPlayableLesson = course.lessons.find((lesson) => getPlayableLessonUrl(lesson));
+    setCurrentLesson((prev) => {
+      if (prev && course.lessons.some((lesson) => lesson.id === prev.id)) {
+        return prev;
+      }
+      return firstPlayableLesson || course.lessons[0] || null;
+    });
+    setExpandedModule(0);
+    setCompletedLessons([]);
+  }, [course]);
 
   useEffect(() => {
     if (!user || !id || !course) return;
@@ -74,6 +109,20 @@ export default function CourseViewerPage() {
     }
   };
 
+  const activeVideoUrl = getPlayableLessonUrl(currentLesson) || course.previewVideoUrl || '';
+
+  // Get index of current lesson to calculate next lesson (preloading & auto-advancing)
+  const currentLessonIndex = currentLesson
+    ? course.lessons.findIndex((lesson) => lesson.id === currentLesson.id)
+    : -1;
+
+  const nextLesson =
+    currentLessonIndex !== -1 && currentLessonIndex + 1 < course.lessons.length
+      ? course.lessons[currentLessonIndex + 1]
+      : null;
+
+  const nextVideoUrl = nextLesson ? getPlayableLessonUrl(nextLesson) : '';
+
   const progress = course.totalLessons > 0
     ? Math.round((completedLessons.length / course.totalLessons) * 100)
     : 0;
@@ -94,20 +143,31 @@ export default function CourseViewerPage() {
           {/* Video Player */}
           <div className="lg:col-span-2">
             <div className="bg-black rounded-lg overflow-hidden aspect-video mb-4">
-              {currentLesson?.videoUrl ? (
-                <video
-                  key={currentLesson.id}
-                  controls
-                  className="w-full h-full"
-                  src={currentLesson.videoUrl}
-                >
-                  Your browser does not support video playback.
-                </video>
+              {activeVideoUrl ? (
+                <VideoPlayer
+                  src={activeVideoUrl}
+                  lessonId={currentLesson?.id || 'preview'}
+                  userId={user?.uid}
+                  nextVideoUrl={nextVideoUrl}
+                  onEnded={() => {
+                    if (currentLesson) {
+                      markComplete(currentLesson.id);
+                      if (nextLesson) {
+                        setCurrentLesson(nextLesson);
+                        const nextModuleIndex = Math.floor((currentLessonIndex + 1) / 4);
+                        setExpandedModule(nextModuleIndex);
+                        toast.success(`Up Next: ${nextLesson.title}`, { icon: '🎓' });
+                      }
+                    }
+                  }}
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-center">
                     <Play className="w-16 h-16 text-accent mx-auto mb-4" />
-                    <p className="text-white/60">Select a lesson to begin</p>
+                    <p className="text-white/60">
+                      {course.lessons.length > 0 ? 'This lesson does not have a playable video yet.' : 'Select a lesson to begin'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -167,7 +227,7 @@ export default function CourseViewerPage() {
                     </button>
                     {expandedModule === mi && (
                       <div>
-                        {module.lessons.map((lesson, li) => (
+                        {module.lessons.map((lesson) => (
                           <button
                             key={lesson.id}
                             onClick={() => setCurrentLesson(lesson)}

@@ -4,6 +4,7 @@ import * as nodemailer from 'nodemailer';
 
 admin.initializeApp();
 const db = admin.firestore();
+const logoUrl = 'https://beckypinder.com.au/images/logo.png';
 
 // Email transporter (configure with your SMTP)
 const transporter = nodemailer.createTransport({
@@ -34,13 +35,14 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
     // Send welcome email
     if (user.email) {
       await transporter.sendMail({
-        from: '"Becky Pinder Yoga" <noreply@beckypinder.com>',
+        from: '"Becky Pinder Yoga" <noreply@beckypinder.com.au>',
         to: user.email,
         subject: 'Welcome to Becky Pinder Yoga & Wellness',
         html: `
           <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #0D1B2A; padding: 30px; text-align: center;">
-              <h1 style="color: #D4AF37; font-size: 28px; margin: 0;">Welcome, ${user.displayName || 'Beautiful Soul'}</h1>
+            <div style="background: #0D1B2A; padding: 25px; text-align: center;">
+              <img src="${logoUrl}" alt="Becky Pinder Logo" style="max-height: 80px; max-width: 250px; display: inline-block; vertical-align: middle; margin-bottom: 10px;" />
+              <h1 style="color: #D4AF37; font-size: 24px; margin: 0;">Welcome, ${user.displayName || 'Beautiful Soul'}</h1>
             </div>
             <div style="padding: 30px; background: #fff;">
               <p>Thank you for joining the Becky Pinder Yoga community.</p>
@@ -51,7 +53,7 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
                 <li><strong>Luxury Retreats</strong> — Immersive wellness escapes in beautiful locations</li>
                 <li><strong>Blog</strong> — Articles on yoga, wellness, and mindful living</li>
               </ul>
-              <p style="margin-top: 20px;">With love & light,<br/><strong>Becky</strong></p>
+              <p style="margin-top: 20px;">Warm wishes,<br/><strong>Becky</strong></p>
             </div>
           </div>
         `,
@@ -71,16 +73,17 @@ export const onOrderCreate = functions.firestore
 
     try {
       await transporter.sendMail({
-        from: '"Becky Pinder Yoga" <noreply@beckypinder.com>',
+        from: '"Becky Pinder Yoga" <noreply@beckypinder.com.au>',
         to: order.userEmail,
         subject: `Payment Confirmation — ${order.itemTitle}`,
         html: `
           <div style="font-family: 'Georgia', serif; max-width: 600px; margin: 0 auto;">
-            <div style="background: #0D1B2A; padding: 30px; text-align: center;">
-              <h1 style="color: #D4AF37; font-size: 24px; margin: 0;">Payment Confirmed</h1>
+            <div style="background: #0D1B2A; padding: 25px; text-align: center;">
+              <img src="${logoUrl}" alt="Becky Pinder Logo" style="max-height: 70px; max-width: 220px; display: inline-block; vertical-align: middle; margin-bottom: 10px;" />
+              <h1 style="color: #D4AF37; font-size: 20px; margin: 0;">Payment Confirmed</h1>
             </div>
             <div style="padding: 30px; background: #fff; border: 1px solid #eee;">
-              <p>Dear ${order.userName},</p>
+              <p>Hi ${order.userName},</p>
               <p>Thank you for your purchase! Here are your details:</p>
               <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
                 <tr style="border-bottom: 1px solid #eee;">
@@ -103,7 +106,7 @@ export const onOrderCreate = functions.firestore
               ${order.type === 'course' ? `
                 <div style="background: #f8f6f0; border: 1px solid #D4AF37; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
                   <p style="margin: 0 0 10px 0; font-weight: bold;">Your course is ready!</p>
-                  <a href="https://beckypinder.com/dashboard" style="display: inline-block; background: #D4AF37; color: #0D1B2A; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">Access Your Course</a>
+                  <a href="https://beckypinder.com.au/dashboard" style="display: inline-block; background: #D4AF37; color: #0D1B2A; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold;">Access Your Course</a>
                 </div>
               ` : `
                 <div style="background: #f8f6f0; border: 1px solid #D4AF37; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
@@ -111,7 +114,7 @@ export const onOrderCreate = functions.firestore
                   <p style="margin: 0; font-size: 14px; color: #666;">We'll be in touch with more details closer to the date.</p>
                 </div>
               `}
-              <p style="margin-top: 20px; font-size: 12px; color: #999;">If you have any questions, reply to this email or contact us at becky@beckypinder.com</p>
+              <p style="margin-top: 20px; font-size: 12px; color: #999;">If you have any questions, reply to this email or contact us at becky@beckypinder.com.au</p>
             </div>
           </div>
         `,
@@ -119,8 +122,8 @@ export const onOrderCreate = functions.firestore
 
       // Notify admin
       await transporter.sendMail({
-        from: '"Becky Pinder Website" <noreply@beckypinder.com>',
-        to: functions.config().admin?.email || 'becky@beckypinder.com',
+        from: '"Becky Pinder Website" <noreply@beckypinder.com.au>',
+        to: functions.config().admin?.email || 'becky@beckypinder.com.au',
         subject: `💰 New ${order.type} purchase: £${order.amount}`,
         html: `
           <p><strong>New purchase!</strong></p>

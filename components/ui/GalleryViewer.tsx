@@ -131,6 +131,7 @@ export function GalleryViewer({ items, initialIndex, onClose }: GalleryViewerPro
               muted
               loop
               playsInline
+              preload="auto"
               className="block max-h-full max-w-full object-contain shadow-2xl transition-opacity duration-300"
               poster={selectedItem.thumbnailUrl || selectedItem.thumbnail || undefined}
               src={selectedItem.url}

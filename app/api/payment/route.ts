@@ -74,7 +74,7 @@ async function fulfillOrder({
   await orderRef.set(orderData);
 
   // Grant course access
-  if (itemType === 'course') {
+  if (itemType === 'course' && !userId.startsWith('guest_')) {
     const userRef = adminDb.collection('users').doc(userId);
     const userDoc = await userRef.get();
     const purchasedCourses = userDoc.data()?.purchasedCourses || [];
@@ -83,46 +83,44 @@ async function fulfillOrder({
     }
   }
 
-  // Grant retreat access + decrement spots
-  if (itemType === 'retreat') {
+  // Grant retreat access
+  if (itemType === 'retreat' && !userId.startsWith('guest_')) {
     const userRef = adminDb.collection('users').doc(userId);
     const userDoc = await userRef.get();
     const registeredRetreats = userDoc.data()?.registeredRetreats || [];
     if (!registeredRetreats.includes(itemId)) {
       await userRef.update({ registeredRetreats: [...registeredRetreats, itemId] });
     }
-    const retreatRef = adminDb.collection('retreats').doc(itemId);
-    const retreatDoc = await retreatRef.get();
-    const retreatData = retreatDoc.data();
-    if (retreatData && retreatData.spotsLeft > 0) {
-      await retreatRef.update({
-        spotsLeft: retreatData.spotsLeft - 1,
-        registrations: (retreatData.registrations || 0) + 1,
-      });
-    }
   }
 
   // Customer invoice email
   try {
+    const cleanUserEmail = userEmail.trim();
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://beckypinder.com.au';
+    const courseAccessUrl = itemType === 'course' ? `${appUrl}/dashboard/courses/${itemId}` : undefined;
+
     await sendInvoiceEmail({
-      to: userEmail,
+      to: cleanUserEmail,
       userName,
       itemTitle,
       amount,
       currency,
       orderId: orderRef.id,
+      paymentId: squarePaymentId || paypalCaptureId,
       receiptUrl: squareReceiptUrl || '',
       paymentLabel: paymentLabel || '',
       type: (itemType || 'course') as 'course' | 'retreat' | 'admin_notification',
+      courseAccessUrl,
     });
   } catch (emailError) {
     console.error('Customer invoice email failed:', emailError);
   }
 
+
   // Admin notification email
   try {
     await sendInvoiceEmail({
-      to: process.env.ADMIN_EMAIL || 'becky@beckypinder.com',
+      to: process.env.ADMIN_EMAIL || 'becky@beckypinder.com.au',
       userName: 'Admin Notification',
       itemTitle: `New ${itemType} purchase [${provider}]: ${itemTitle} by ${userName} (${userEmail})`,
       amount,
@@ -171,6 +169,23 @@ export async function POST(req: NextRequest) {
     if (provider === 'square') {
       if (!sourceId) {
         return NextResponse.json({ error: 'Missing sourceId for Square payment' }, { status: 400 });
+      }
+
+      // 1. Check the merchant's location to verify currency support
+      const { result: locationResult } = await squareClient.locationsApi.retrieveLocation(
+        process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
+      );
+      const merchantCurrency = locationResult.location?.currency || 'AUD';
+
+      if (paymentCurrency !== merchantCurrency) {
+        return NextResponse.json(
+          {
+            error: `Currency Mismatch: Your Square account is set to ${merchantCurrency}, but you tried to charge in ${paymentCurrency}. To charge in ${paymentCurrency}, you must use a Square account registered in a country that supports it (e.g., Australia for AUD).`,
+            merchantCurrency,
+            requestedCurrency: paymentCurrency,
+          },
+          { status: 400 }
+        );
       }
 
       const { result } = await squareClient.paymentsApi.createPayment({
@@ -252,19 +267,47 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: `Unknown payment provider: ${provider}` }, { status: 400 });
   } catch (error: any) {
-    console.error('Payment error:', error);
-    if (error?.code === 16 || /UNAUTHENTICATED/i.test(error?.message || '')) {
-      return NextResponse.json(
-        {
-          error:
-            'Firebase Admin authentication failed while saving the order. Your service account key is missing, revoked, or belongs to the wrong project.',
-        },
-        { status: 500 }
-      );
+    console.error('Global Payment API Error:', error);
+    
+    let message = error.message || 'Payment processing failed';
+    let statusCode = 500;
+
+    // 1. Handle Square specific API errors
+    if (error.result && error.result.errors && Array.isArray(error.result.errors)) {
+      const squareErrors = error.result.errors;
+      if (squareErrors.length > 0) {
+        // Extract the most descriptive message from the first error
+        message = squareErrors[0].detail || squareErrors[0].message || message;
+        statusCode = 400; // Client-side solvable usually if it's a Square API error
+      }
     }
+
+    // 2. Handle known string patterns in message
+    const lowerMessage = message.toLowerCase();
+    if (lowerMessage.includes('unauthenticated') || error.code === 16) {
+      message = 'Internal database authentication error. Please try again later.';
+      statusCode = 500;
+    } else if (lowerMessage.includes('invalid_client')) {
+      message = 'PayPal authentication failure. Please contact support.';
+      statusCode = 500;
+    } else if (lowerMessage.includes('insufficient_funds')) {
+      message = 'Transaction declined: Insufficient funds.';
+      statusCode = 400;
+    } else if (lowerMessage.includes('cvv_failure')) {
+      message = 'Transaction declined: Invalid CVV.';
+      statusCode = 400;
+    } else if (lowerMessage.includes('card_declined')) {
+      message = 'Transaction declined: Your card was declined. Please try another card.';
+      statusCode = 400;
+    } else if (lowerMessage.includes('expired_card')) {
+      message = 'Transaction declined: Your card has expired.';
+      statusCode = 400;
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Payment processing failed' },
-      { status: 500 }
+      { error: message },
+      { status: statusCode }
     );
   }
+
 }

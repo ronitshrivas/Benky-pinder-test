@@ -22,8 +22,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ orderId });
   } catch (error: any) {
     console.error('PayPal create-order error:', error);
+    const message = error.message || '';
+    let friendlyMessage = 'Failed to create PayPal order';
+    
+    if (message.includes('invalid_client')) {
+      friendlyMessage = 'PayPal authentication failed. Please contact the administrator.';
+    }
+
     return NextResponse.json(
-      { error: error.message || 'Failed to create PayPal order' },
+      { error: friendlyMessage },
       { status: 500 }
     );
   }

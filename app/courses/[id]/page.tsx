@@ -106,8 +106,8 @@ export default function CourseDetailPage() {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="font-serif text-2xl text-primary mb-4">Lessons</h2>
             <div className="space-y-3">
-              {course.lessons?.length ? course.lessons.map((lesson) => (
-                <div key={lesson.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3">
+              {course.lessons?.length ? course.lessons.map((lesson, index) => (
+                <div key={lesson.id || `${course.id}-lesson-${index + 1}`} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3">
                   <div>
                     <p className="font-medium text-primary">{lesson.title}</p>
                     <p className="text-xs text-text-light">{lesson.description}</p>
@@ -124,7 +124,7 @@ export default function CourseDetailPage() {
         <aside className="lg:col-span-1">
           <div className="bg-white rounded-lg shadow-sm p-6 sticky top-24">
             <p className="text-text-light text-sm">Course price</p>
-            <div className="font-serif text-4xl text-accent mt-2 mb-6">{formatPrice(course.price, 'AUD')}</div>
+            <div className="font-serif text-4xl text-accent mt-2 mb-6">{formatPrice(course.price, course.currency || 'AUD')}</div>
 
             {owned ? (
               <>

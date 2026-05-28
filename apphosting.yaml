@@ -41,32 +41,31 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_SQUARE_APP_ID
-    value: "sandbox-sq0idb-RQJeFnXWPYvMM59dRqq5Zw"
+    value: "sq0idp-zODKl2IKqMuR_se6jLEJMw"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_SQUARE_LOCATION_ID
-    value: "LF70P7VKY4ZQW"
+    value: "SWG8DJD0456T5"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: SQUARE_ENVIRONMENT
-    value: "sandbox"
+    value: "production"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: NEXT_PUBLIC_PAYPAL_CLIENT_ID
-    value: "ATYkWk-78d5g1MYT_6HCzuRuERWiAueP5ufNLY0H8b02_Hc0v9_0bmFwMOTn28eIF2YfgbL\
-      WQ8VYw6wO"
+    value: "AXsIauzVppLEDM3rSh_bzcgLJ-fXJ6rzOx1Q_Vgbhd0xrum83TGLV70jEMnbQRvV5w8E3hNgKjMCQGbW"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: PAYPAL_ENVIRONMENT
-    value: "sandbox"
+    value: "production"
     availability:
       - BUILD
       - RUNTIME
@@ -89,6 +88,13 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: NEXT_PUBLIC_BUNNY_LIBRARY_ID
+    value: "666270"
+    availability:
+      - BUILD
+      - RUNTIME
+
+
   - variable: EMAIL_FROM
     value: "Becky Pinder Yoga <pinderbecky7@gmail.com>"
     availability:
@@ -106,3 +112,5 @@ env:
     secret: paypalClientSecret
   - variable: EMAIL_PASSWORD
     secret: emailPassword
+  - variable: BUNNY_API_KEY
+    secret: bunnyApiKey

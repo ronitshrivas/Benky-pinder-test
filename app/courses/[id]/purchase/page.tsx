@@ -127,7 +127,7 @@ export default function CoursePurchasePage() {
             </div>
             <div className="text-right">
               <p className="text-text-light text-sm">Total</p>
-              <div className="font-serif text-3xl text-accent">{formatPrice(course.price, 'AUD')}</div>
+              <div className="font-serif text-3xl text-accent">{formatPrice(course.price, course.currency || 'AUD')}</div>
             </div>
           </div>
 
@@ -135,7 +135,7 @@ export default function CoursePurchasePage() {
           {user && (
             <PaymentForm
               amount={course.price}
-              currency="AUD"
+              currency={course.currency || 'AUD'}
               userId={user.uid}
               userEmail={user.email!}
               userName={userData?.displayName || user.displayName || 'Student'}

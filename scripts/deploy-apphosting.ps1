@@ -44,5 +44,6 @@ function Set-Secret {
 Set-Secret -Key 'squareAccessToken' -Value (Get-EnvValue 'SQUARE_ACCESS_TOKEN')
 Set-Secret -Key 'paypalClientSecret' -Value (Get-EnvValue 'PAYPAL_CLIENT_SECRET')
 Set-Secret -Key 'emailPassword' -Value (Get-EnvValue 'EMAIL_PASSWORD')
+Set-Secret -Key 'bunnyApiKey' -Value (Get-EnvValue 'BUNNY_API_KEY')
 
 & $firebase deploy --project $projectId --config (Join-Path $repoRoot 'firebase.json')

@@ -12,10 +12,20 @@ import { Skeleton } from '@/components/ui/Skeleton';
 const aboutMobileImage = '/images/about.jpeg';
 const aboutDesktopImage = '/images/about copy.jpeg';
 
+const fallbackBio = [
+  'As a dedicated practitioner of Yoga for 35 years and a teacher of Yoga for 15 years I have come to experience first-hand the transformative potency of Yoga both in my own life and in the lives of others.',
+  'The unique gift of Yoga is that the benefits trickle down through every layer of our being, physical, mental, emotional and spiritual.',
+  'Over the decades I have been very fortunate to have practiced with many wonderful Yoga, meditation and movement teachers in extensive trainings both in Australia and internationally. My own approach to teaching is grounded in the simple aspiration to feel great in the body. I have come to understand that there is a strong connection between how we move and hold ourselves. I have come to understand that there is a strong connection between how we move and express in our bodies to the energy we broadcast out to the world.',
+  'My professional life also includes decades of experience as a hair and makeup artist where I worked both in the commercial and event world as well as in some of Sydneys most prestigious salons. With a client list that includes women from all walks of life from working mums to CEO’s and entrepreneurs to film and television personalities.',
+  'Through both Yoga and my experience in the beauty world I have come to learn that true radiance is not something you apply or put on it is something you embody. My intention for the retreat and travel experiences I offer along with my online classes is to share distilled empowering practices in an environment where the qualities of self-acceptance and self-confidence can thrive. Whether in some far flung location or virtually.',
+  'I flavour everything with the ethos that life is to be lived fully, abundantly and with as much joy as we can squeeze in!',
+].join('\n\n');
+
 export default function BeckyPage() {
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [bioContent, setBioContent] = useState<string>(fallbackBio);
 
   useEffect(() => {
     let active = true;
@@ -40,6 +50,32 @@ export default function BeckyPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadBio() {
+      try {
+        const response = await fetch('/api/admin/becky', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || 'Failed to load Becky bio');
+        }
+        if (active) {
+          setBioContent(data.bioContent || fallbackBio);
+        }
+      } catch (error) {
+        console.error('Failed to load Becky bio:', error);
+        if (active) setBioContent(fallbackBio);
+      }
+    }
+
+    loadBio();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const isVideoItem = (item: GalleryItem) =>
     item.type === 'video' ||
     /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(item.url || '') ||
@@ -47,6 +83,7 @@ export default function BeckyPage() {
     /\.(mp4|mov|webm|m4v)(\?|#|$)/i.test(item.thumbnail || '');
 
   const marqueeItems = galleryItems.length > 1 ? [...galleryItems, ...galleryItems, ...galleryItems] : galleryItems;
+  const bioParagraphs = bioContent.split(/\n\s*\n/).map((paragraph) => paragraph.trim()).filter(Boolean);
 
   return (
     <>
@@ -79,24 +116,11 @@ export default function BeckyPage() {
       <section className="section-padding bg-surface">
         <div className="max-w-4xl mx-auto">
           <div className="prose prose-lg max-w-none space-y-6 text-text-light leading-relaxed">
-            <p>
-              As a dedicated practitioner of Yoga for 35 years and a teacher of Yoga for 15 years I have come to experience first-hand the transformative potency of Yoga both in my own life and in the lives of others.
-              The unique gift of Yoga is that the benefits trickle down through every layer of our being, physical, mental, emotional and spiritual.
-
-            </p>
-            <p>
-              Over the decades I have been very fortunate to have practiced with many wonderful Yoga, meditation and movement teachers in extensive trainings both in Australia and internationally. My own approach to teaching is grounded in the simple aspiration to feel great in the body. I have come to understand that there is a strong connection between how we move and hold ourselves. I have come to understand that there is a strong connection between how we move and express in our bodies to the energy we broadcast out to the world.
-            </p>
-            <p>
-My professional life also includes decades of experience as a hair and makeup artist where I worked both in the commercial and event world as well as in some of Sydneys most prestigious salons.
-With a client list that includes women from all walks of life from working mums to CEO’s and entrepreneurs to film and television personalities.             </p>
-            <p>
-              Through both Yoga and my experience in the beauty world I have come to  learn that true radiance is  not something you apply or put on it is something you embody. My intention for the retreat and travel experiences I offer along with my online classes is to share distilled empowering practices in an environment where the qualities of self-acceptance and self-confidence can thrive. 
-Whether in some far flung location or virtually. 
-            </p>
-            <p>
-              I flavour everything with the ethos that life is to be lived fully, abundantly and with as much joy as we can squeeze in!
-            </p>
+            {bioParagraphs.map((paragraph, index) => (
+              <p key={`${index}-${paragraph.slice(0, 24)}`}>
+                {paragraph}
+              </p>
+            ))}
             {/* <p className="font-serif text-primary text-xl mt-8">
               I look forward to welcome you on this.
             </p> */}
@@ -109,7 +133,7 @@ Whether in some far flung location or virtually.
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <p className="section-label">My Philosophy</p>
-            <h2 className="section-title">What Guides My Teaching</h2>
+            <h2 className="section-title">What Guides My Approach</h2>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {[

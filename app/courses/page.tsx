@@ -114,7 +114,7 @@ export default function CoursesPage() {
             <p className="section-label text-accent mb-3">Online Learning</p>
             <h1 className="font-serif text-4xl md:text-6xl text-white">Video Courses</h1>
             <p className="text-white/75 mt-4 max-w-xl mx-auto">
-              Expert-led video courses you can access anytime, anywhere. Learn at your own pace.
+              Access classes anytime,anywhere. Learn at your own pace.
             </p>
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function CoursesPage() {
                         src={course.thumbnailUrl || course.thumbnail || '/images/course1.jpg'}
                         alt={course.title}
                         fill
-                        className="object-cover object-[50%_30%] sm:object-[50%_28%] lg:object-center scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
+                        className="object-cover scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
                       />
                       <div className="absolute inset-0 bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                         {owned ? (
@@ -198,7 +198,7 @@ export default function CoursesPage() {
                         </Link>
                       ) : (
                         <>
-                          <span className="text-accent font-serif text-2xl">{formatPrice(course.price, 'AUD')}</span>
+                          <span className="text-accent font-serif text-2xl">{formatPrice(course.price, course.currency || 'AUD')}</span>
                           <Link href={user ? `/courses/${course.id}/purchase` : '/login'} className="btn-primary text-xs py-2 px-4">
                             Buy Course
                           </Link>

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'react-hot-toast';
-import { PayPalProvider } from '@/components/providers/PayPalProvider';
 import { AuthProvider } from '@/lib/auth-context';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
@@ -17,28 +16,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <PayPalProvider>
-          <AuthProvider>
-            <Navbar />
-            <main className="min-h-screen pt-24">
-              <PageTransition>{children}</PageTransition>
-            </main>
-            <Footer />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                style: {
-                  background: '#1B2A4A',
-                  color: '#fff',
-                  borderRadius: '8px',
-                },
-                success: {
-                  iconTheme: { primary: '#C9A84C', secondary: '#1B2A4A' },
-                },
-              }}
-            />
-          </AuthProvider>
-        </PayPalProvider>
+        <AuthProvider>
+          <Navbar />
+          <main className="min-h-screen pt-24">
+            <PageTransition>{children}</PageTransition>
+          </main>
+          <Footer />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: '#1B2A4A',
+                color: '#fff',
+                borderRadius: '8px',
+              },
+              success: {
+                iconTheme: { primary: '#C9A84C', secondary: '#1B2A4A' },
+              },
+            }}
+          />
+        </AuthProvider>
       </body>
     </html>
   );

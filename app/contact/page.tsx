@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Mail, MapPin, Instagram, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { InstagramPopupLink } from '@/components/ui/InstagramPopupLink';
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' });
@@ -52,8 +51,8 @@ export default function ContactPage() {
                 <Mail className="w-5 h-5 text-accent mt-1 mr-3" />
                 <div>
                   <p className="font-medium text-sm">Email</p>
-                  <a href="mailto:pinderbecky7@gmail.com" className="text-text-light text-sm hover:text-accent">
-                    pinderbecky7@gmail.com
+                  <a href="mailto:becky@beckypinder.com.au" className="text-text-light text-sm hover:text-accent">
+                    becky@beckypinder.com.au
                   </a>
                 </div>
               </div>
@@ -68,7 +67,7 @@ export default function ContactPage() {
                 <Instagram className="w-5 h-5 text-accent mt-1 mr-3" />
                 <div>
                   <p className="font-medium text-sm">Instagram</p>
-                  <InstagramPopupLink placement="bottom" className="text-text-light text-sm hover:text-accent text-left" />
+                  <a href="https://www.instagram.com/dariwoman" target="_blank" rel="noopener noreferrer" className="text-text-light text-sm hover:text-accent text-left">@dariwoman</a>
                 </div>
               </div>
             </div>

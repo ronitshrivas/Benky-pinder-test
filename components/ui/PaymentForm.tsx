@@ -29,7 +29,7 @@ export interface PaymentFormProps {
   userName: string;
   itemId: string;
   itemTitle: string;
-  itemType: 'course' | 'retreat';
+  itemType: 'course' | 'retreat' | 'bundle';
   itemThumbnail?: string;
   itemVideoUrl?: string;
   paymentLabel?: string;

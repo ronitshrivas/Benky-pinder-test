@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/lib/auth-context';
 import { getCourseById } from '@/lib/firestore';
 import { Course } from '@/types';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, hasCourseAccess } from '@/lib/utils';
 import { PaymentForm } from '@/components/ui/PaymentForm';
 
 export default function CoursePurchasePage() {
@@ -78,7 +78,7 @@ export default function CoursePurchasePage() {
     );
   }
 
-  const owned = !!user && !!userData?.purchasedCourses?.includes(course.id);
+  const owned = !!user && hasCourseAccess(userData?.purchasedCourses, userData?.courseExpiry, course.id);
 
   if (owned) {
     return (
@@ -170,7 +170,7 @@ export default function CoursePurchasePage() {
             <p className="text-accent text-sm uppercase tracking-wider mb-2">Included</p>
             <ul className="space-y-2 text-white/80 text-sm">
               <li>{course.totalLessons} on-demand lessons</li>
-              <li>Lifetime access to the course area</li>
+              <li>6 months unlimited access from purchase date</li>
               <li>Secure checkout via Square or PayPal</li>
             </ul>
           </div>

@@ -97,10 +97,10 @@ Important:
 
 The app sends invoice and notification emails using Nodemailer.
 
-Recommended Gmail setup:
-1. Turn on 2-step verification in Google Account security.
-2. Create an app password for Mail.
-3. Use that password as your SMTP secret.
+Recommended Gmail or GoDaddy SMTP setup:
+1. Use an email account that supports authenticated SMTP.
+2. If your provider requires it, create an app password or enable SMTP AUTH.
+3. Use the SMTP host, port, username, and password from your provider.
 
 Update these values:
 - `EMAIL_HOST`
@@ -130,7 +130,7 @@ NEXT_PUBLIC_SQUARE_LOCATION_ID=...
 SQUARE_ACCESS_TOKEN=...
 SQUARE_ENVIRONMENT=sandbox
 
-EMAIL_HOST=smtp.gmail.com
+EMAIL_HOST=smtp.office365.com
 EMAIL_PORT=587
 EMAIL_USER=...
 EMAIL_PASSWORD=...

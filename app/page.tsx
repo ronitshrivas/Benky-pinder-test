@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Leaf, Heart, Sun, Sparkles, Star, Check } from 'lucide-react';
-import { getCourses, getRetreats } from '@/lib/firestore';
+import { getCourses, getRetreats, getTestimonials } from '@/lib/firestore';
 import { formatDate, formatPrice } from '@/lib/utils';
-import { Course, Retreat } from '@/types';
+import { Course, Retreat, Testimonial } from '@/types';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 const heroMobileImage = '/images/mobile1.png';
@@ -22,88 +22,6 @@ const pillars = [
   { icon: Sparkles, title: 'Feminine Wisdom', desc: 'Embrace your power' },
 ];
 
-const testimonials = [
-  {
-    name: 'Louise',
-    meta: 'Student for 7 years',
-    rating: 5,
-    text:
-      'Becky is a wonderful yoga teacher. Her classes are friendly, inclusive and uplifting, and equally suited to beginners and those more experienced, to the young and those of more mature age. She has a warm, wise and calm presence, and we love her!',
-  },
-  {
-    name: 'Debbie',
-    meta: '',
-    rating: 5,
-    text:
-      'I attended Becky\'s beautiful classes for more than 6 years. To sum up: calms the mind, balm for the soul, each class a different challenge for the body, incorporating all 3 together in a way no other teacher has done in the past. We all miss her!',
-  },
-  {
-    name: 'Carolyn and Mark',
-    meta: '',
-    rating: 5,
-    text:
-      'We first met Becky at a retreat she held at Brampston beach. We had a great experience and have since attended her classes. Her expert knowledge and calming vibe is magical. Can\'t recommend her enough. Loved by all.',
-  },
-  {
-    name: 'Carlos',
-    meta: '',
-    rating: 5,
-    text:
-      'I devoted my time to attend Becky\'s classes weekly for over 3 years. Her class isn\'t a routine, alternates different poses, from core to flexibility, focuses the mind body connection by breath work to start the class, including affirmation. I love the integration of the spiritual aspect of her class. I always found myself centred, positive and calm for the day after her classes. Namaste.',
-  },
-  {
-    name: 'Coleen',
-    meta: 'Student for 7 years',
-    rating: 5,
-    text:
-      'Rebecca is a brilliant teacher, she is fun and communicates well so the moves are easy to follow. All the classes had a genuine friendly feel and everyone was able to participate to their own level. I would thoroughly recommend Rebecca as a wonderful teacher and person.',
-  },
-  {
-    name: 'Ann',
-    meta: '',
-    rating: 5,
-    text:
-      'During the last 8 years I have found Rebecca to be a truly inspirational yoga teacher. Not only is she a master of yoga, she also demonstrates patience and kindness. She has been greatly missed by her students in Far North Qld, but we live in hope that one day she may return.',
-  },
-  {
-    name: 'Frances',
-    meta: 'Student for 5 years',
-    rating: 5,
-    text:
-      'I had never done any previous yoga classes and started with Rebecca after finishing full time work. I found the classes beneficial physically but also for the mind. Her personal touches within the class are very special. Starting with a warm welcome, and she was always aware of everyone\'s differences within the practice. Attending Rebecca\'s classes was also the start of belonging to a wonderful community. Rebecca is both a beautiful instructor and person.',
-  },
-  {
-    name: 'Sally',
-    meta: '',
-    rating: 5,
-    text:
-      'I enjoyed Becky\'s yoga classes for well over a decade. In her soothing voice she began and ended her classes with gentle, partly guided meditations. Her participants were at various levels, and she always encouraged modifications to suit our own bodies. I am so sorry that she moved away!',
-  },
-  {
-    name: 'Shelagh',
-    meta: '',
-    rating: 5,
-    text: 'Love your teaching style Becky. You guide each of us to achieve the very best we can. Thank you.',
-  },
-  {
-    name: 'Stephanie',
-    meta: '',
-    rating: 5,
-    text: 'Becky has the gift to inspire and educate with the wisdom of an old soul. I would  highly recommend anyone who wants to nurture their body and soul to attend one of her fantastic and rejuvenating retreats.',
-  },
-  {
-    name: 'Basha',
-    meta: '',
-    rating: 5,
-    text: 'I love going to Becky’s classes. She is one of the best Yoga teachers I have been to over the years and I miss her very much. ',
-  },
-  {
-    name: 'Fiona',
-    meta: '',
-    rating: 5,
-    text: 'I attended my first Yoga class ever in my mid 60’s. I thought what am I doing here with all these experienced people. I don’t belong. How wrong was I ! Becky made me feel so comfortable and welcome and gave me adjustments so I could participate in the class. I am astounded by the improvements I have made. Becky reminded me that you are never too old to learn something new. ',
-  }
-];
 
 function InnerCircleForm() {
   const [email, setEmail] = useState('');
@@ -184,6 +102,7 @@ function InnerCircleForm() {
 export default function HomePage() {
   const [featuredRetreat, setFeaturedRetreat] = useState<Retreat | null>(null);
   const [featuredCourses, setFeaturedCourses] = useState<Course[]>([]);
+  const [dynamicTestimonials, setDynamicTestimonials] = useState<Testimonial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -191,7 +110,11 @@ export default function HomePage() {
 
     async function loadHomepageContent() {
       try {
-        const [retreats, courses] = await Promise.all([getRetreats(true), getCourses(true)]);
+        const [retreats, courses, dbTestimonials] = await Promise.all([
+          getRetreats(true),
+          getCourses(true),
+          getTestimonials(true).catch(() => [] as Testimonial[])
+        ]);
         if (cancelled) return;
 
         const nextRetreat = retreats.find((retreat) => retreat.featured) || retreats[0] || null;
@@ -199,6 +122,7 @@ export default function HomePage() {
 
         setFeaturedRetreat(nextRetreat);
         setFeaturedCourses(nextCourses.length > 0 ? nextCourses : courses.slice(0, 3));
+        setDynamicTestimonials(dbTestimonials);
       } catch (error) {
         console.error('Failed to load homepage content:', error);
         if (!cancelled) {
@@ -307,6 +231,20 @@ export default function HomePage() {
                   background: '#C9A84C',
                 }}
               />
+               <p
+                className="hidden md:block"
+                style={{
+                  fontFamily: '"Cormorant Garamond", serif',
+                  fontWeight: 500,
+                  fontSize: 'clamp(18px, 3vw, 30px)',
+                  lineHeight: 1.10,
+                  color: '#1B2A4A',
+                  marginTop: '14px',
+                }}
+              >
+                Online Yoga Classes
+                <sup style={{ fontSize: '0.38em', fontFamily: 'Montserrat, sans-serif', verticalAlign: 'super', marginLeft: '1px' }}></sup>
+              </p>
 
               {/* Line 3: "Trust Your Design™" — Cormorant medium dark */}
               <p
@@ -324,8 +262,8 @@ export default function HomePage() {
                 <sup style={{ fontSize: '0.38em', fontFamily: 'Montserrat, sans-serif', verticalAlign: 'super', marginLeft: '1px' }}></sup>
               </p>
 
-              {/* CTA Button — outlined, "EXPLORE NOW" */}
-              <div className="hero-explore-cta mt-8 md:mt-[10px]">
+              {/* CTA Button — outlined, "EXPLORE NOW" and "ONLINE CLASSES" */}
+              <div className="hero-explore-cta mt-8 md:mt-[20px] flex flex-col md:flex-row gap-3 items-start">
                 <a
                   href="/retreats"
                   style={{
@@ -333,7 +271,7 @@ export default function HomePage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     height: '38px',
-                    minWidth: '120px',
+                    width: '150px',
                     padding: '0 12px',
                     border: '1px solid #C9A84C',
                     color: 'black',
@@ -357,6 +295,39 @@ export default function HomePage() {
                   }}
                 >
                   EXPLORE NOW
+                </a>
+
+                <a
+                  href="/courses"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '38px',
+                    width: '150px',
+                    padding: '0 12px',
+                    border: '1px solid #C9A84C',
+                    color: 'black',
+                    fontFamily: '"Montserrat", sans-serif',
+                    fontWeight: 500,
+                    fontSize: '9px',
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+
+                    backdropFilter: 'blur(3px)',
+                    transition: 'all 0.3s ease',
+                    textDecoration: 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.background = '#1B2A4A';
+                    (e.currentTarget as HTMLAnchorElement).style.color = '#fff';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLAnchorElement).style.background = 'rgba(255,255,255,0.12)';
+                    (e.currentTarget as HTMLAnchorElement).style.color = '#1B2A4A';
+                  }}
+                >
+                  ONLINE CLASSES
                 </a>
               </div>
 
@@ -471,6 +442,7 @@ export default function HomePage() {
               src="/images/img7.jpeg"
               alt="Becky Pinder"
               fill
+              sizes="(max-width: 1023px) 100vw, 50vw"
               className="object-cover transition-transform duration-700 hover:scale-105"
             />
           </div>
@@ -521,6 +493,7 @@ export default function HomePage() {
                       src={course.thumbnailUrl || course.thumbnail || '/images/yoga5.jpg'}
                       alt={course.title}
                       fill
+                      sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-110"
                     />
                   </div>
@@ -583,7 +556,7 @@ export default function HomePage() {
             <h2 className="section-title text-primary">What Students Say</h2>
           </div>
           <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
-            {testimonials.map((t, i) => (
+            {dynamicTestimonials.map((t, i) => (
               <div key={i} className="card border border-surface-dark bg-white p-8 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl md:p-7">
                 <div className="mb-3 flex gap-1">
                   {[...Array(t.rating || 5)].map((_, star) => (
@@ -616,6 +589,7 @@ export default function HomePage() {
               src={`/images/${img}`}
               alt="Becky Pinder Yoga"
               fill
+              sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, 25vw"
               className="object-cover transition-transform duration-700 group-hover:scale-110"
             />
           </div>

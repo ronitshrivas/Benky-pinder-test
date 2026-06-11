@@ -73,14 +73,41 @@ async function fulfillOrder({
   };
   await orderRef.set(orderData);
 
-  // Grant course access
+  // Grant course access (handles both standard courses and bundles)
   if (itemType === 'course' && !userId.startsWith('guest_')) {
     const userRef = adminDb.collection('users').doc(userId);
     const userDoc = await userRef.get();
     const purchasedCourses = userDoc.data()?.purchasedCourses || [];
-    if (!purchasedCourses.includes(itemId)) {
-      await userRef.update({ purchasedCourses: [...purchasedCourses, itemId] });
+    const courseExpiry: Record<string, string> = userDoc.data()?.courseExpiry || {};
+    
+    // Fetch course details to see if it's a bundle
+    const courseDoc = await adminDb.collection('courses').doc(itemId).get();
+    const courseData = courseDoc.data();
+    
+    // Calculate 6 months from now
+    const expiryDate = new Date();
+    expiryDate.setMonth(expiryDate.getMonth() + 6);
+    const expiryIso = expiryDate.toISOString();
+    
+    let nextCourses = [...purchasedCourses, itemId];
+    courseExpiry[itemId] = expiryIso;
+    
+    if (courseData?.isBundle && Array.isArray(courseData.bundledCourses)) {
+      nextCourses = [...nextCourses, ...courseData.bundledCourses];
+      // Apply same expiry to all bundled courses
+      for (const bundledId of courseData.bundledCourses) {
+        courseExpiry[bundledId] = expiryIso;
+      }
     }
+    
+    // Deduplicate array
+    nextCourses = Array.from(new Set(nextCourses));
+    
+    await userRef.update({ 
+      purchasedCourses: nextCourses,
+      courseExpiry,
+      updatedAt: new Date().toISOString(),
+    });
   }
 
   // Grant retreat access
@@ -97,7 +124,9 @@ async function fulfillOrder({
   try {
     const cleanUserEmail = userEmail.trim();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://beckypinder.com.au';
-    const courseAccessUrl = itemType === 'course' ? `${appUrl}/dashboard/courses/${itemId}` : undefined;
+    const courseAccessUrl = itemType === 'course' 
+      ? `${appUrl}/dashboard/courses/${itemId}` 
+      : undefined;
 
     await sendInvoiceEmail({
       to: cleanUserEmail,

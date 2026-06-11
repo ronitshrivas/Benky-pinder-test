@@ -6,16 +6,19 @@ const logoUrl = `${appUrl}/images/logo.png`;
 function requireEnv(value: string | undefined, name: string) {
   const cleaned = value?.trim();
   if (!cleaned || cleaned === 'your-app-password-here') {
-    throw new Error(`Missing or invalid ${name}. Set a real Gmail app password in .env.local.`);
+    throw new Error(`Missing or invalid ${name}. Set a real value in .env.local.`);
   }
   return cleaned;
 }
 
 function createTransporter() {
+  const host = requireEnv(process.env.EMAIL_HOST, 'EMAIL_HOST');
+  const port = Number(requireEnv(process.env.EMAIL_PORT, 'EMAIL_PORT'));
+
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT),
-    secure: false,
+    host,
+    port,
+    secure: port === 465,
     auth: {
       user: requireEnv(process.env.EMAIL_USER, 'EMAIL_USER'),
       pass: requireEnv(process.env.EMAIL_PASSWORD, 'EMAIL_PASSWORD'),
@@ -34,7 +37,7 @@ export async function sendEmail({
 }) {
   const transporter = createTransporter();
   const cleanTo = to.trim();
-  const fromEmail = process.env.EMAIL_USER || 'pinderbecky7@gmail.com';
+  const fromEmail = requireEnv(process.env.EMAIL_FROM || process.env.EMAIL_USER, 'EMAIL_FROM or EMAIL_USER');
   const fromName = 'Becky Pinder Yoga';
 
   console.log(`Sending email to: ${cleanTo} with subject: ${subject}`);

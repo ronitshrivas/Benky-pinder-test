@@ -6,6 +6,7 @@ import {
   Pause,
   RotateCcw,
   RotateCw,
+  Cast,
   Volume2,
   VolumeX,
   Maximize,
@@ -88,6 +89,40 @@ function getStreamingEmbedUrl(url: string): { embedUrl: string; provider: 'youtu
   return { embedUrl: '', provider: null };
 }
 
+function extractBunnyIds(url: string): { libraryId: string; videoId: string } | null {
+  const match =
+    url.match(/(?:iframe\.mediadelivery\.net\/embed|video\.bunnycdn\.com\/play)\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/mediadelivery\.net\/play\/([a-zA-Z0-9_-]+)\/([a-zA-Z0-9_-]+)/);
+
+  if (!match) return null;
+  return { libraryId: match[1], videoId: match[2] };
+}
+
+function inferMimeType(url: string): string {
+  const cleanUrl = url.split('?')[0].toLowerCase();
+  if (cleanUrl.endsWith('.m3u8')) return 'application/x-mpegURL';
+  if (cleanUrl.endsWith('.mpd')) return 'application/dash+xml';
+  if (cleanUrl.endsWith('.webm')) return 'video/webm';
+  if (cleanUrl.endsWith('.mov')) return 'video/quicktime';
+  return 'video/mp4';
+}
+
+function isDirectVideoUrl(url: string): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    /^https?:\/\//i.test(url) &&
+    !lower.includes('youtube.com') &&
+    !lower.includes('youtu.be') &&
+    !lower.includes('vimeo.com') &&
+    !lower.includes('wistia.com') &&
+    !lower.includes('wistia.net') &&
+    !lower.includes('mediadelivery.net') &&
+    !lower.includes('bunny.net') &&
+    !lower.includes('b-cdn.net')
+  );
+}
+
 interface VideoPlayerProps {
   src: string;
   lessonId: string;
@@ -95,6 +130,7 @@ interface VideoPlayerProps {
   nextVideoUrl?: string;
   onEnded?: () => void;
   poster?: string;
+  title?: string;
 }
 
 export default function VideoPlayer({
@@ -104,28 +140,22 @@ export default function VideoPlayer({
   nextVideoUrl,
   onEnded,
   poster,
+  title,
 }: VideoPlayerProps) {
-  // Early return for third-party streaming hosts for zero-lag and adaptive bitrates
   const { embedUrl, provider } = getStreamingEmbedUrl(src);
-
-  if (provider) {
-    return (
-      <div className="relative w-full h-full bg-black rounded-lg overflow-hidden shadow-xl border border-white/5 aspect-video">
-        <iframe
-          src={embedUrl}
-          className="absolute inset-0 w-full h-full border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-          loading="lazy"
-          title="Course Lesson Video Player"
-        />
-      </div>
-    );
-  }
-
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const castInitRef = useRef(false);
+  const [resolvedMedia, setResolvedMedia] = useState<{
+    kind: 'video' | 'iframe';
+    src: string;
+    castUrl: string;
+    mimeType: string;
+    provider: 'youtube' | 'vimeo' | 'wistia' | 'bunny' | null;
+  } | null>(null);
+  const [isResolvingMedia, setIsResolvingMedia] = useState(true);
 
   // Core Playback State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -151,9 +181,204 @@ export default function VideoPlayer({
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [savedResumeTime, setSavedResumeTime] = useState(0);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isCastReady, setIsCastReady] = useState(false);
+  const [isCasting, setIsCasting] = useState(false);
 
   const storageKey = `becky_pinder_lesson_progress_${userId}_${lessonId}`;
+  const activeMediaSrc = resolvedMedia?.src || src;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function resolveMedia() {
+      if (!cancelled) {
+        setIsResolvingMedia(true);
+      }
+
+      const directVideoUrl = isDirectVideoUrl(src);
+      if (provider && provider !== 'bunny') {
+        if (!cancelled) {
+          setResolvedMedia({
+            kind: 'iframe',
+            src: embedUrl || src,
+            castUrl: '',
+            mimeType: '',
+            provider,
+          });
+          setIsResolvingMedia(false);
+        }
+        return;
+      }
+
+      if (provider === 'bunny') {
+        const ids = extractBunnyIds(src) || extractBunnyIds(embedUrl);
+        if (ids) {
+          try {
+            const res = await fetch(`/api/bunny/play?libraryId=${encodeURIComponent(ids.libraryId)}&videoId=${encodeURIComponent(ids.videoId)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const fallbackUrl = typeof data?.fallbackUrl === 'string' ? data.fallbackUrl : '';
+              const originalUrl = typeof data?.originalUrl === 'string' ? data.originalUrl : '';
+              const playlistUrl = typeof data?.videoPlaylistUrl === 'string' ? data.videoPlaylistUrl : '';
+              const hasMp4 = Boolean(data?.hasMP4Fallback);
+              const isPlayable = Boolean(data?.isPlayable);
+
+              // Always use iframe embed for Bunny — it's 100% reliable.
+              // Keep castUrl so Chromecast can stream the HLS/MP4 directly to the TV.
+              const castUrl = fallbackUrl || playlistUrl || originalUrl;
+
+              if (!cancelled) {
+                setResolvedMedia({
+                  kind: 'iframe',
+                  src: embedUrl || src,
+                  castUrl,
+                  mimeType: fallbackUrl ? inferMimeType(fallbackUrl) : playlistUrl ? inferMimeType(playlistUrl) : originalUrl ? inferMimeType(originalUrl) : '',
+                  provider: 'bunny',
+                });
+                setIsResolvingMedia(false);
+              }
+              return;
+            }
+          } catch {
+            // Fall through to iframe mode below.
+          }
+        }
+
+        if (!cancelled) {
+          setResolvedMedia({
+            kind: 'iframe',
+            src: embedUrl || src,
+            castUrl: '',
+            mimeType: '',
+            provider: 'bunny',
+          });
+          setIsResolvingMedia(false);
+        }
+        return;
+      }
+
+      if (directVideoUrl) {
+        if (!cancelled) {
+          setResolvedMedia({
+            kind: 'video',
+            src,
+            castUrl: src,
+            mimeType: inferMimeType(src),
+            provider: null,
+          });
+          setIsResolvingMedia(false);
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setResolvedMedia({
+          kind: 'iframe',
+          src: embedUrl || src,
+          castUrl: '',
+          mimeType: '',
+          provider,
+        });
+        setIsResolvingMedia(false);
+      }
+    }
+
+    resolveMedia();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [embedUrl, provider, src]);
+
+  useEffect(() => {
+    if (castInitRef.current) return;
+
+    let cancelled = false;
+    const attemptInit = () => {
+      const w = window as any;
+      if (!w.cast?.framework?.CastContext || !w.chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID) {
+        return false;
+      }
+
+      try {
+        const castContext = w.cast.framework.CastContext.getInstance();
+        castContext.setOptions({
+          receiverApplicationId: w.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+          autoJoinPolicy: w.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+        });
+        castInitRef.current = true;
+        setIsCastReady(true);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    if (attemptInit()) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      if (cancelled) return;
+      if (attemptInit()) {
+        clearInterval(interval);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleCast = async () => {
+    const mediaUrl = resolvedMedia?.castUrl || '';
+    if (!mediaUrl) {
+      toast.error('Chromecast is not available for this video source.');
+      return;
+    }
+
+    const w = window as any;
+    const castContext = w.cast?.framework?.CastContext?.getInstance?.();
+    if (!castContext) {
+      toast.error('Chromecast is still loading. Please try again in a moment.');
+      return;
+    }
+
+    try {
+      if (!castContext.getCurrentSession()) {
+        await castContext.requestSession();
+      }
+
+      const session = castContext.getCurrentSession();
+      if (!session) {
+        throw new Error('No Cast session available.');
+      }
+
+      const mediaInfo = new w.chrome.cast.media.MediaInfo(
+        mediaUrl,
+        resolvedMedia?.mimeType || inferMimeType(mediaUrl)
+      );
+      const metadata = new w.chrome.cast.media.GenericMediaMetadata();
+      metadata.title = title || (resolvedMedia?.provider === 'bunny' ? 'Becky Pinder Yoga' : `Lesson ${lessonId}`);
+      if (poster) {
+        metadata.images = [new w.chrome.cast.Image(poster)];
+      }
+      mediaInfo.metadata = metadata;
+
+      const loadRequest = new w.chrome.cast.media.LoadRequest(mediaInfo);
+      loadRequest.autoplay = true;
+
+      await session.loadMedia(loadRequest);
+      setIsCasting(true);
+      resetControlsTimer();
+      toast.success('Casting to your TV');
+    } catch (error) {
+      console.error('Chromecast failed:', error);
+      setIsCasting(false);
+      toast.error('Unable to start Chromecast.');
+    }
+  };
 
   // 1. Mouse movement timer to auto-hide control overlay
   const resetControlsTimer = () => {
@@ -199,7 +424,7 @@ export default function VideoPlayer({
       document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
-  }, []);
+  }, [activeMediaSrc]);
 
   // 1c. Listen to iOS webkitbeginfullscreen / webkitendfullscreen directly on video element
   useEffect(() => {
@@ -282,7 +507,7 @@ export default function VideoPlayer({
         return () => clearTimeout(timer);
       }
     }
-  }, [src, lessonId, storageKey]);
+  }, [activeMediaSrc, lessonId, storageKey]);
 
   // 3. Keep localStorage updated (throttled)
   useEffect(() => {
@@ -310,7 +535,7 @@ export default function VideoPlayer({
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [src, storageKey]);
+  }, [activeMediaSrc, storageKey]);
 
   // 4. Keyboard Shortcuts
   useEffect(() => {
@@ -603,6 +828,46 @@ export default function VideoPlayer({
 
   // Progress Bar styling values
   const activePercentage = duration ? ((isDraggingSeek ? draggedTime : currentTime) / duration) * 100 : 0;
+  const isIframeMode = resolvedMedia?.kind === 'iframe';
+  const canCast = Boolean(resolvedMedia?.castUrl);
+  const currentVideoSrc = activeMediaSrc;
+
+  if (isResolvingMedia) {
+    return (
+      <div className="relative w-full h-full bg-black rounded-lg overflow-hidden shadow-xl border border-white/5 aspect-video flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-accent animate-spin" />
+      </div>
+    );
+  }
+
+  if (isIframeMode) {
+    return (
+      <div
+        ref={playerContainerRef}
+        className="relative w-full h-full bg-black rounded-lg overflow-hidden shadow-xl border border-white/5 aspect-video"
+      >
+        {canCast && (
+          <button
+            onClick={handleCast}
+            disabled={!isCastReady}
+            className="absolute right-3 top-3 z-20 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/85 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Cast to TV"
+          >
+            <Cast className="h-4 w-4" />
+            Cast
+          </button>
+        )}
+        <iframe
+          src={currentVideoSrc}
+          className="absolute inset-0 h-full w-full border-0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          loading="lazy"
+          title="Course Lesson Video Player"
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -611,10 +876,21 @@ export default function VideoPlayer({
       onMouseLeave={() => isPlaying && setIsControlsVisible(false)}
       className="relative w-full h-full bg-black flex items-center justify-center select-none overflow-hidden group shadow-xl border border-white/5 rounded-lg"
     >
+      {canCast && (
+        <button
+          onClick={handleCast}
+          disabled={!isCastReady}
+          className="absolute right-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50"
+          title="Cast to TV"
+        >
+          <Cast className="h-4 w-4" />
+          Cast
+        </button>
+      )}
       {/* 1. Actual Video Element */}
       <video
         ref={videoRef}
-        src={src}
+        src={currentVideoSrc}
         poster={poster}
         preload="auto"
         controlsList="nodownload"
@@ -641,7 +917,27 @@ export default function VideoPlayer({
         onPause={() => setIsPlaying(false)}
         onProgress={updateBufferedRanges}
         onEnded={handleVideoEnded}
-        onError={() => toast.error('This video could not be loaded. Please check format/network.')}
+        onError={(e) => {
+          const video = e.currentTarget;
+          const errorCode = video.error?.code;
+          const errorMessage = video.error?.message || 'unknown';
+          console.error('Video load error:', { code: errorCode, message: errorMessage, src: video.src });
+
+          // Native video failed — log for debugging but keep the error toast for non-Bunny sources
+          if (resolvedMedia?.provider === 'bunny') {
+            // Bunny always uses iframe now, so this branch shouldn't fire.
+            // If it does, silently switch to embed without nagging the user.
+            if (embedUrl && resolvedMedia?.kind !== 'iframe') {
+              setResolvedMedia({
+                ...resolvedMedia,
+                kind: 'iframe',
+                src: embedUrl,
+              });
+            }
+          } else {
+            toast.error('This video could not be loaded. Please check format/network.');
+          }
+        }}
       />
 
       {/* 2. Background Preloader for the NEXT Video (Bandwidth Optimization) */}

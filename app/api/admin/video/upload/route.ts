@@ -96,9 +96,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Return the secure media embed URL to client
+    // 6. Fetch play metadata so the client can prefer a direct media URL when available
+    const playRes = await fetch(`https://video.bunnycdn.com/library/${libraryId}/videos/${videoId}/play`);
+    let playbackUrl = '';
+    let playbackMimeType = '';
+
+    if (playRes.ok) {
+      const playData = await playRes.json();
+      playbackUrl = playData?.fallbackUrl || playData?.originalUrl || '';
+      playbackMimeType = playbackUrl.endsWith('.m3u8')
+        ? 'application/x-mpegURL'
+        : playbackUrl
+          ? 'video/mp4'
+          : '';
+    }
+
+    // 7. Return both the embed URL and the playable media URL
     const bunnyEmbedUrl = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}`;
-    return NextResponse.json({ url: bunnyEmbedUrl });
+    return NextResponse.json({
+      url: playbackUrl || bunnyEmbedUrl,
+      embedUrl: bunnyEmbedUrl,
+      playbackUrl,
+      playbackMimeType,
+      videoId,
+      libraryId,
+    });
   } catch (error: any) {
     console.error('Failed to stream video upload:', error);
     return NextResponse.json(

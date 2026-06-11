@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Edit2, X, Upload, Video, Save, Eye, EyeOff, DollarSign, GripVertical, Check } from 'lucide-react';
+import { Plus, Trash2, Edit2, X, Upload, Video, Save, Eye, EyeOff, DollarSign, GripVertical, Check, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getCourses, addCourse, updateCourse, deleteCourse } from '@/lib/firestore';
 import { uploadFile, uploadFileWithProgress } from '@/lib/firebase';
@@ -22,7 +22,8 @@ export default function AdminCoursesPage() {
   const [editCourse, setEditCourse] = useState<Course | null>(null);
   const [form, setForm] = useState({
     title: '', description: '', price: '', currency: 'USD',
-    thumbnail: '', category: 'yoga', status: 'published' as 'published' | 'draft',
+    thumbnail: '', category: 'yoga', status: 'published' as 'published' | 'draft' | 'upcoming',
+    isBundle: false, bundledCourses: [] as string[],
   });
   const [lessons, setLessons] = useState<Partial<Lesson>[]>([]);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -48,6 +49,8 @@ export default function AdminCoursesPage() {
       totalLessons: nextLessons.length,
       totalDuration: nextLessons.reduce((acc, l) => acc + (parseInt(l.duration || '0') || 0), 0) + ' mins',
       updatedAt: new Date().toISOString(),
+      isBundle: form.isBundle,
+      bundledCourses: form.isBundle ? form.bundledCourses : [],
     };
   };
 
@@ -248,7 +251,7 @@ export default function AdminCoursesPage() {
     setForm({
       title: course.title, description: course.description, price: course.price.toString(),
       currency: course.currency, thumbnail: course.thumbnail, category: course.category,
-      status: course.status,
+      status: course.status, isBundle: course.isBundle || false, bundledCourses: course.bundledCourses || [],
     });
     setLessons((course.lessons || []).map((lesson, index) => ({
       ...lesson,
@@ -260,7 +263,7 @@ export default function AdminCoursesPage() {
 
   const resetForm = () => {
     setEditCourse(null);
-    setForm({ title: '', description: '', price: '', currency: 'USD', thumbnail: '', category: 'yoga', status: 'published' });
+    setForm({ title: '', description: '', price: '', currency: 'USD', thumbnail: '', category: 'yoga', status: 'published' as any, isBundle: false, bundledCourses: [] });
     setLessons([]);
     setThumbnailFile(null);
     setThumbnailPreview('');
@@ -333,7 +336,11 @@ export default function AdminCoursesPage() {
                     <td className="px-6 py-4 text-sm text-text-light">{course.totalLessons}</td>
                     <td className="px-6 py-4 text-sm text-text-light">{course.enrolledCount}</td>
                     <td className="px-6 py-4">
-                      <span className={`text-xs px-2 py-1 rounded ${course.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        course.status === 'published' ? 'bg-green-100 text-green-700' :
+                        course.status === 'upcoming' ? 'bg-blue-100 text-blue-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
                         {course.status}
                       </span>
                     </td>
@@ -368,12 +375,14 @@ export default function AdminCoursesPage() {
               >
                 Course Details
               </button>
-              <button
-                onClick={() => setActiveSection('lessons')}
-                className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px ${activeSection === 'lessons' ? 'border-accent text-accent' : 'border-transparent text-text-light'}`}
-              >
-                Lessons ({lessons.length})
-              </button>
+              {!form.isBundle && (
+                <button
+                  onClick={() => setActiveSection('lessons')}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px ${activeSection === 'lessons' ? 'border-accent text-accent' : 'border-transparent text-text-light'}`}
+                >
+                  Lessons ({lessons.length})
+                </button>
+              )}
             </div>
 
             <form onSubmit={handleSubmit} className="p-6">
@@ -436,11 +445,55 @@ export default function AdminCoursesPage() {
                         <Eye className="w-4 h-4" /><span className="text-sm">Published</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" checked={form.status === 'upcoming'} onChange={() => setForm({ ...form, status: 'upcoming' })} className="accent-accent" />
+                        <Sparkles className="w-4 h-4 text-accent" /><span className="text-sm">Upcoming</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
                         <input type="radio" checked={form.status === 'draft'} onChange={() => setForm({ ...form, status: 'draft' })} className="accent-accent" />
                         <EyeOff className="w-4 h-4" /><span className="text-sm">Draft</span>
                       </label>
                     </div>
                   </div>
+                  <div>
+                    <label className="flex items-center gap-3 cursor-pointer p-4 border rounded-lg hover:bg-gray-50">
+                      <input 
+                        type="checkbox" 
+                        checked={form.isBundle} 
+                        onChange={(e) => setForm({ ...form, isBundle: e.target.checked })}
+                        className="w-5 h-5 accent-accent"
+                      />
+                      <div>
+                        <p className="font-medium text-primary text-sm">This is a Course Bundle</p>
+                        <p className="text-xs text-text-light">Instead of uploading video lessons, you can group multiple existing courses together.</p>
+                      </div>
+                    </label>
+                  </div>
+                  {form.isBundle && (
+                    <div className="border p-4 rounded-lg bg-gray-50">
+                      <label className="input-label mb-3">Select Courses for this Bundle</label>
+                      <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                        {courses.filter(c => c.id !== editCourse?.id && !c.isBundle).map(c => (
+                          <label key={c.id} className="flex items-center gap-3 p-2 bg-white border rounded cursor-pointer hover:border-accent">
+                            <input 
+                              type="checkbox"
+                              checked={form.bundledCourses.includes(c.id)}
+                              onChange={(e) => {
+                                const newSelection = e.target.checked 
+                                  ? [...form.bundledCourses, c.id]
+                                  : form.bundledCourses.filter(id => id !== c.id);
+                                setForm({ ...form, bundledCourses: newSelection });
+                              }}
+                              className="accent-accent w-4 h-4"
+                            />
+                            <div className="flex items-center gap-2">
+                              {c.thumbnail && <img src={c.thumbnail} alt="" className="w-8 h-8 rounded object-cover" />}
+                              <span className="text-sm font-medium text-primary">{c.title}</span>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Lessons Section */

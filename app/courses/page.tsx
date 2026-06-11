@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Play, Clock, BarChart3, Lock } from 'lucide-react';
+import { Play, Clock, BarChart3, Lock, Sparkles, BookOpen } from 'lucide-react';
 import { getCourses } from '@/lib/firestore';
 import { Course } from '@/types';
-import { formatPrice } from '@/lib/utils';
+import { formatPrice, hasCourseAccess } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { Skeleton } from '@/components/ui/Skeleton';
 import toast from 'react-hot-toast';
@@ -68,8 +68,8 @@ export default function CoursesPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getCourses();
-        if (data.length > 0) setCourses(data);
+        const coursesData = await getCourses();
+        if (coursesData.length > 0) setCourses(coursesData);
       } catch (e) {
         toast.error('Failed to load courses');
       } finally {
@@ -86,7 +86,7 @@ export default function CoursesPage() {
   }, []);
 
   const filtered = filter === 'all' ? courses : courses.filter((c) => c.category === filter);
-  const categories = ['all'];
+  const categories = ['all', ...Array.from(new Set(courses.map(c => c.category).filter(Boolean)))];
 
   return (
     <>
@@ -120,27 +120,29 @@ export default function CoursesPage() {
         </div>
       </section>
 
-      {/* Filter */}
-      <section className="bg-surface-cream py-6 border-b">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-3">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setFilter(cat)}
-              className={`px-5 py-2 text-xs tracking-wider uppercase rounded-full transition-all ${
-                filter === cat
-                  ? 'bg-primary text-accent'
-                  : 'bg-white text-text-light hover:bg-surface-cream'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+      {/* Categories Filter */}
+      <section className="bg-surface-cream py-8 border-b">
+        <div className="max-w-7xl mx-auto px-4">
+            <div className="flex flex-wrap justify-center gap-3">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setFilter(cat)}
+                  className={`px-5 py-2 text-xs tracking-wider uppercase rounded-full transition-all ${
+                    filter === cat
+                      ? 'bg-primary text-accent'
+                      : 'bg-white text-text-light hover:bg-surface-cream'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
         </div>
       </section>
 
-      {/* Courses Grid */}
-      <section className="section-padding bg-surface">
+      {/* Courses/Bundles Grid */}
+      <section className="section-padding bg-surface animate-fade-in">
         <div className="max-w-7xl mx-auto">
           {isLoading ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -158,58 +160,128 @@ export default function CoursesPage() {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {filtered.map((course) => {
-              const owned = userData?.purchasedCourses?.includes(course.id);
-              return (
-                <div key={course.id} className="card group animate-fade-up">
-                  <Link href={`/courses/${course.id}`} className="block">
-                    <div className="relative aspect-[4/3] overflow-hidden">
-                      <Image
-                        src={course.thumbnailUrl || course.thumbnail || '/images/course1.jpg'}
-                        alt={course.title}
-                        fill
-                        className="object-cover scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
-                      />
-                      <div className="absolute inset-0 bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        {owned ? (
-                          <Play className="w-12 h-12 text-accent" />
-                        ) : (
-                          <Lock className="w-10 h-10 text-primary/80" />
+                const owned = !!user && hasCourseAccess(userData?.purchasedCourses, userData?.courseExpiry, course.id);
+                const isExpired = !!user && !!userData?.purchasedCourses?.includes(course.id) && !owned;
+                return (
+                  <div key={course.id} className="card group animate-fade-up">
+                    <Link href={`/courses/${course.id}`} className="block">
+                      <div className="relative aspect-[4/3] overflow-hidden">
+                        <Image
+                          src={course.thumbnailUrl || course.thumbnail || '/images/course1.jpg'}
+                          alt={course.title}
+                          fill
+                          sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw"
+                          className="object-cover scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
+                        />
+                        <div className="absolute inset-0 bg-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          {course.status === 'upcoming' ? (
+                            <Sparkles className="w-12 h-12 text-accent" />
+                          ) : owned ? (
+                            <Play className="w-12 h-12 text-accent" />
+                          ) : (
+                            <Lock className="w-10 h-10 text-primary/80" />
+                          )}
+                        </div>
+                        <div className="absolute top-3 left-3 bg-accent text-primary px-3 py-1 text-xs font-semibold rounded">
+                          {course.category}
+                        </div>
+                        {course.status === 'upcoming' && (
+                          <div className="absolute top-3 right-3 bg-primary text-accent px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded shadow-md">
+                            Coming Soon
+                          </div>
                         )}
                       </div>
-                      <div className="absolute top-3 left-3 bg-accent text-primary px-3 py-1 text-xs font-semibold rounded">
-                        {course.category}
+                    </Link>
+                  {course.isBundle ? (
+                    <div className="p-6">
+                      <Link href={`/courses/${course.id}`} className="inline-block">
+                        <h3 className="font-serif text-xl text-primary mb-3 hover:text-accent transition-colors">{course.title}</h3>
+                      </Link>
+                      <p className="text-text-light text-sm leading-relaxed mb-5">{course.description}</p>
+                      
+                      {/* Bundle Courses Preview */}
+                      <div className="mb-6 pt-4 border-t border-gray-50">
+                        <span className="text-[10px] uppercase tracking-wider font-semibold text-text-light block mb-2">Courses Included:</span>
+                        <ul className="text-xs text-text-light/90 space-y-1.5">
+                          {(course.bundledCourses || []).slice(0, 4).map((courseId) => {
+                            const matched = courses.find(c => c.id === courseId);
+                            return matched ? (
+                              <li key={courseId} className="flex items-center gap-1.5 font-medium truncate">
+                                <span className="text-accent text-sm">🌿</span> {matched.title}
+                              </li>
+                            ) : null;
+                          })}
+                          {(course.bundledCourses?.length || 0) > 4 && (
+                            <li className="text-xs text-accent font-medium pl-5">+ {(course.bundledCourses?.length || 0) - 4} more courses</li>
+                          )}
+                        </ul>
+                      </div>
+
+                      <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                        {owned ? (
+                          <Link href="/dashboard" className="btn-primary text-xs py-2 px-4">
+                            Go to Dashboard
+                          </Link>
+                        ) : isExpired ? (
+                          <>
+                            <span className="text-amber-600 text-xs font-semibold">Access Expired</span>
+                            <Link href={`/courses/${course.id}/purchase`} className="btn-primary text-xs py-2 px-4">
+                              Repurchase
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-accent font-serif text-2xl">{formatPrice(course.price, course.currency || 'AUD')}</span>
+                            <Link href={user ? `/courses/${course.id}/purchase` : '/login'} className="btn-primary text-xs py-2 px-4">
+                              Buy Bundle
+                            </Link>
+                          </>
+                        )}
                       </div>
                     </div>
-                  </Link>
-                  <div className="p-6">
-                    <div className="flex items-center gap-4 text-xs text-text-light mb-3">
-                      <span className="flex items-center"><Clock className="w-3 h-3 mr-1" />{course.duration}</span>
-                      <span className="flex items-center"><BarChart3 className="w-3 h-3 mr-1" />{course.level}</span>
-                      <span>{course.totalLessons} lessons</span>
-                    </div>
-                    <Link href={`/courses/${course.id}`} className="inline-block">
-                      <h3 className="font-serif text-xl text-primary mb-2 hover:text-accent transition-colors">{course.title}</h3>
-                    </Link>
-                    <p className="text-text-light text-sm leading-relaxed mb-4">{course.description}</p>
-                    <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                      {owned ? (
-                        <Link href={`/dashboard/courses/${course.id}`} className="btn-primary text-xs py-2 px-4">
-                          Continue Learning
-                        </Link>
-                      ) : (
-                        <>
-                          <span className="text-accent font-serif text-2xl">{formatPrice(course.price, course.currency || 'AUD')}</span>
-                          <Link href={user ? `/courses/${course.id}/purchase` : '/login'} className="btn-primary text-xs py-2 px-4">
-                            Buy Course
+                  ) : (
+                    <div className="p-6">
+                      <div className="flex items-center gap-4 text-xs text-text-light mb-3">
+                        <span className="flex items-center"><Clock className="w-3 h-3 mr-1" />{course.duration}</span>
+                        <span className="flex items-center"><BarChart3 className="w-3 h-3 mr-1" />{course.level}</span>
+                        <span>{course.totalLessons} lessons</span>
+                      </div>
+                      <Link href={`/courses/${course.id}`} className="inline-block">
+                        <h3 className="font-serif text-xl text-primary mb-2 hover:text-accent transition-colors">{course.title}</h3>
+                      </Link>
+                      <p className="text-text-light text-sm leading-relaxed mb-4">{course.description}</p>
+                      <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                        {course.status === 'upcoming' ? (
+                          <>
+                            <span className="text-text-light font-sans text-xs font-semibold uppercase tracking-wider">Coming Soon</span>
+                            <span className="text-xs text-accent font-semibold bg-primary-pale/50 px-2.5 py-1 rounded">Upcoming</span>
+                          </>
+                        ) : owned ? (
+                          <Link href={`/dashboard/courses/${course.id}`} className="btn-primary text-xs py-2 px-4">
+                            Continue Learning
                           </Link>
-                        </>
-                      )}
+                        ) : isExpired ? (
+                          <>
+                            <span className="text-amber-600 text-xs font-semibold">Access Expired</span>
+                            <Link href={`/courses/${course.id}/purchase`} className="btn-primary text-xs py-2 px-4">
+                              Repurchase
+                            </Link>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-accent font-serif text-2xl">{formatPrice(course.price, course.currency || 'AUD')}</span>
+                            <Link href={user ? `/courses/${course.id}/purchase` : '/login'} className="btn-primary text-xs py-2 px-4">
+                              Buy Course
+                            </Link>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
-            </div>
+          </div>
           )}
         </div>
       </section>
@@ -221,7 +293,7 @@ export default function CoursesPage() {
           <div className="grid md:grid-cols-3 gap-8">
             {[
               { step: '01', title: 'Choose Your Course', desc: 'Browse our library and find the perfect programme for your goals.' },
-              { step: '02', title: 'Make Payment', desc: 'Secure checkout via Square. You\'ll receive an invoice by email.' },
+              { step: '02', title: 'Make Payment', desc: "Secure checkout via Square. You'll receive an invoice by email." },
               { step: '03', title: 'Start Learning', desc: 'Instant access to classes you can take anytime/anywhere.' },
             ].map((item) => (
                 <div key={item.step}>

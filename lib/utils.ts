@@ -45,3 +45,34 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
+
+/**
+ * Returns true if the user currently has active (non-expired) access to a course.
+ * - If courseExpiry is missing for that course, the user is grandfathered in (lifetime access).
+ * - If an expiry date exists and it is in the past, access is denied.
+ */
+export function hasCourseAccess(
+  purchasedCourses: string[] | undefined,
+  courseExpiry: Record<string, string> | undefined,
+  courseId: string,
+): boolean {
+  if (!purchasedCourses?.includes(courseId)) return false;
+  const expiry = courseExpiry?.[courseId];
+  if (!expiry) return true; // grandfathered – no expiry recorded
+  return new Date(expiry) > new Date();
+}
+
+/**
+ * Returns a human-readable label for when course access expires.
+ * Returns null if the user doesn't own the course or is grandfathered.
+ */
+export function getCourseExpiryLabel(
+  purchasedCourses: string[] | undefined,
+  courseExpiry: Record<string, string> | undefined,
+  courseId: string,
+): string | null {
+  if (!purchasedCourses?.includes(courseId)) return null;
+  const expiry = courseExpiry?.[courseId];
+  if (!expiry) return null; // grandfathered
+  return formatDate(expiry);
+}

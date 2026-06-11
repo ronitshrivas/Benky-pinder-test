@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { getCourseById, updateLessonProgress } from '@/lib/firestore';
 import { Course, Lesson } from '@/types';
 import toast from 'react-hot-toast';
+import { hasCourseAccess } from '@/lib/utils';
 
 function getPlayableLessonUrl(lesson: Lesson | null): string {
   if (!lesson) return '';
@@ -65,20 +66,27 @@ export default function CourseViewerPage() {
       return firstPlayableLesson || course.lessons[0] || null;
     });
     setExpandedModule(0);
-    setCompletedLessons([]);
-  }, [course]);
+    setCompletedLessons(userData?.lessonProgress?.[course.id] || []);
+  }, [course, userData]);
+
+  useEffect(() => {
+    if (course && userData?.lessonProgress?.[course.id]) {
+      setCompletedLessons(userData.lessonProgress[course.id]);
+    }
+  }, [course, userData]);
 
   useEffect(() => {
     if (!user || !id || !course) return;
-    if (userData?.purchasedCourses?.includes(id as string)) return;
+    if (hasCourseAccess(userData?.purchasedCourses, userData?.courseExpiry, id as string)) return;
     if (purchaseRefreshAttempted.current) return;
 
     purchaseRefreshAttempted.current = true;
     refreshUserData().catch(() => undefined);
   }, [user, id, course, userData, refreshUserData]);
 
-  // Check if user has purchased this course
-  const hasPurchased = userData?.purchasedCourses?.includes(id as string);
+  // Check if user has active (non-expired) access to this course
+  const hasPurchased = hasCourseAccess(userData?.purchasedCourses, userData?.courseExpiry, id as string);
+  const isExpired = !!userData?.purchasedCourses?.includes(id as string) && !hasPurchased;
 
   if (!course) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full" /></div>;
 
@@ -87,11 +95,23 @@ export default function CourseViewerPage() {
       <div className="min-h-screen flex items-center justify-center bg-surface px-4">
         <div className="text-center max-w-md">
           <Lock className="w-16 h-16 text-text-light/30 mx-auto mb-4" />
-          <h1 className="font-serif text-2xl text-primary mb-2">Course Locked</h1>
-          <p className="text-text-light mb-6">You need to purchase this course to access the video lessons.</p>
-          <button onClick={() => router.push(`/courses/${id}/purchase`)} className="btn-primary">
-            Purchase Course
-          </button>
+          {isExpired ? (
+            <>
+              <h1 className="font-serif text-2xl text-primary mb-2">Access Expired</h1>
+              <p className="text-text-light mb-6">Your 6-month access to this course has expired. Repurchase to continue learning.</p>
+              <button onClick={() => router.push(`/courses/${id}/purchase`)} className="btn-primary">
+                Repurchase Course
+              </button>
+            </>
+          ) : (
+            <>
+              <h1 className="font-serif text-2xl text-primary mb-2">Course Locked</h1>
+              <p className="text-text-light mb-6">You need to purchase this course to access the video lessons.</p>
+              <button onClick={() => router.push(`/courses/${id}/purchase`)} className="btn-primary">
+                Purchase Course
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -149,6 +169,7 @@ export default function CourseViewerPage() {
                   lessonId={currentLesson?.id || 'preview'}
                   userId={user?.uid}
                   nextVideoUrl={nextVideoUrl}
+                  title={currentLesson?.title || course.title}
                   onEnded={() => {
                     if (currentLesson) {
                       markComplete(currentLesson.id);

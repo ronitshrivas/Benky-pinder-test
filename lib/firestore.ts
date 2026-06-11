@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { slugify } from './utils';
-import { Course, Retreat, GalleryItem, BlogPost, Payment, Inquiry, User, Order, BeckyPageContent } from '@/types';
+import { Course, Retreat, GalleryItem, BlogPost, Payment, Inquiry, User, Order, BeckyPageContent, Testimonial, ComplimentaryVideo } from '@/types';
 
 type FirestoreRecord = Record<string, any>;
 
@@ -96,7 +96,8 @@ function toRetreatExperiences(value: unknown): Retreat['experiences'] {
 function toCourse(docData: FirestoreRecord, id: string): Course {
   const thumbnail = docData.thumbnail || docData.thumbnailUrl || '';
   const lessons = normalizeLessons(docData.lessons, id);
-  const published = typeof docData.published === 'boolean' ? docData.published : docData.status !== 'draft';
+  const status = docData.status || (docData.published ? 'published' : 'draft');
+  const published = status === 'published' || status === 'upcoming';
   return {
     id,
     title: docData.title || '',
@@ -115,11 +116,13 @@ function toCourse(docData: FirestoreRecord, id: string): Course {
     lessons,
     totalLessons: Number(docData.totalLessons || lessons.length),
     published,
-    status: published ? 'published' : 'draft',
+    status: status as 'published' | 'draft' | 'upcoming',
     featured: Boolean(docData.featured),
     createdAt: docData.createdAt || new Date().toISOString(),
     updatedAt: docData.updatedAt || docData.createdAt || new Date().toISOString(),
     enrolledCount: Number(docData.enrolledCount || 0),
+    isBundle: Boolean(docData.isBundle),
+    bundledCourses: Array.isArray(docData.bundledCourses) ? docData.bundledCourses : [],
   };
 }
 
@@ -216,6 +219,7 @@ function toUser(docData: FirestoreRecord, id: string): User {
     updatedAt: docData.updatedAt || docData.createdAt || new Date().toISOString(),
     purchasedCourses: Array.isArray(docData.purchasedCourses) ? docData.purchasedCourses : [],
     registeredRetreats: Array.isArray(docData.registeredRetreats) ? docData.registeredRetreats : [],
+    courseExpiry: docData.courseExpiry && typeof docData.courseExpiry === 'object' ? docData.courseExpiry : {},
   };
 }
 
@@ -247,6 +251,8 @@ export async function getCourse(id: string): Promise<Course | null> {
 
 export async function createCourse(data: FirestoreRecord): Promise<string> {
   const lessons = normalizeLessons(data.lessons, data.slug || slugify(data.title || 'course'));
+  const status = data.status || (data.published === false ? 'draft' : 'published');
+  const published = status === 'published' || status === 'upcoming';
   const docRef = await addDoc(collection(db, 'courses'), {
     slug: data.slug || slugify(data.title || 'course'),
     ...data,
@@ -257,8 +263,8 @@ export async function createCourse(data: FirestoreRecord): Promise<string> {
     thumbnail: data.thumbnail || data.thumbnailUrl || '',
     duration: data.duration || data.totalDuration || '',
     totalDuration: data.totalDuration || data.duration || '',
-    published: typeof data.published === 'boolean' ? data.published : data.status !== 'draft',
-    status: data.status || (data.published === false ? 'draft' : 'published'),
+    published,
+    status,
     lessons,
     totalLessons: Number(data.totalLessons || lessons.length),
     enrolledCount: Number(data.enrolledCount || 0),
@@ -270,13 +276,15 @@ export async function createCourse(data: FirestoreRecord): Promise<string> {
 
 export async function updateCourse(id: string, data: FirestoreRecord): Promise<void> {
   const lessons = normalizeLessons(data.lessons, id);
+  const status = data.status || (data.published === false ? 'draft' : 'published');
+  const published = status === 'published' || status === 'upcoming';
   await updateDoc(doc(db, 'courses', id), {
     ...data,
     slug: data.slug || (data.title ? slugify(data.title) : undefined),
     thumbnailUrl: data.thumbnailUrl || data.thumbnail,
     thumbnail: data.thumbnail || data.thumbnailUrl,
-    published: typeof data.published === 'boolean' ? data.published : data.status !== 'draft',
-    status: data.status || (data.published === false ? 'draft' : 'published'),
+    published,
+    status,
     duration: data.duration || data.totalDuration,
     totalDuration: data.totalDuration || data.duration,
     lessons,
@@ -616,7 +624,6 @@ export async function createInquiry(data: Omit<Inquiry, 'id'>): Promise<string> 
 // ═══════════════════════════════════════════════════════════
 // COMPLIMENTARY VIDEO  (Inner Circle)
 // ═══════════════════════════════════════════════════════════
-import { ComplimentaryVideo } from '@/types';
 
 export async function getComplimentaryVideo(): Promise<ComplimentaryVideo | null> {
   const snap = await getDoc(doc(db, 'siteContent', 'complimentaryVideo'));
@@ -643,3 +650,41 @@ export async function getSubscriberByToken(token: string) {
 export async function markSubscriberWatched(docId: string): Promise<void> {
   await updateDoc(doc(db, 'subscribers', docId), { hasWatched: true });
 }
+
+// ═══════════════════════════════════════════════════════════
+// TESTIMONIALS
+// ═══════════════════════════════════════════════════════════
+export async function getTestimonials(publishedOnly = true): Promise<Testimonial[]> {
+  const q = publishedOnly
+    ? query(collection(db, 'testimonials'), where('published', '==', true), orderBy('order', 'asc'))
+    : query(collection(db, 'testimonials'), orderBy('order', 'asc'));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Testimonial));
+}
+
+export async function createTestimonial(data: FirestoreRecord): Promise<string> {
+  const docRef = await addDoc(collection(db, 'testimonials'), {
+    name: data.name || '',
+    meta: data.meta || '',
+    rating: Number(data.rating ?? 5),
+    text: data.text || '',
+    order: Number(data.order ?? 0),
+    published: data.published !== false,
+    createdAt: new Date().toISOString(),
+  });
+  return docRef.id;
+}
+
+export async function updateTestimonial(id: string, data: FirestoreRecord): Promise<void> {
+  await updateDoc(doc(db, 'testimonials', id), {
+    ...data,
+    rating: data.rating !== undefined ? Number(data.rating) : undefined,
+    order: data.order !== undefined ? Number(data.order) : undefined,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+export async function deleteTestimonial(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'testimonials', id));
+}
+export const addTestimonial = createTestimonial;

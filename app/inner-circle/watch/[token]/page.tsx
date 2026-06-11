@@ -149,6 +149,7 @@ export default function InnerCircleWatchPage() {
             src={video!.videoUrl}
             lessonId="inner-circle-complimentary"
             userId={undefined}
+            title={video!.title}
           />
         </div>
 

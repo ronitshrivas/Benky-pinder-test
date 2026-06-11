@@ -6,15 +6,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Play, BookOpen, Receipt, User, Clock, CheckCircle, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
-import { getCourseById, getUserPurchases } from '@/lib/firestore';
-import { Order } from '@/types';
-import { formatPrice, formatDate } from '@/lib/utils';
+import { getCourses, getUserPurchases } from '@/lib/firestore';
+import { Order, Course } from '@/types';
+import { formatPrice, formatDate, hasCourseAccess, getCourseExpiryLabel } from '@/lib/utils';
 
 export default function DashboardPage() {
   const { user, userData, loading: authLoading, logout } = useAuth();
   const router = useRouter();
   const [purchases, setPurchases] = useState<Order[]>([]);
-  const [resolvedThumbnails, setResolvedThumbnails] = useState<Record<string, string>>({});
+  const [ownedCourses, setOwnedCourses] = useState<Course[]>([]);
   const [activeTab, setActiveTab] = useState<'courses' | 'history'>('courses');
 
   useEffect(() => {
@@ -26,45 +26,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (user) {
       getUserPurchases(user.uid).then(setPurchases).catch(console.error);
+      getCourses(false).then((allCourses) => {
+        const owned = allCourses.filter(c => hasCourseAccess(userData?.purchasedCourses, userData?.courseExpiry, c.id));
+        setOwnedCourses(owned);
+      }).catch(console.error);
     }
-  }, [user]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function resolveThumbnails() {
-      const missing = purchases.filter(
-        (purchase) => purchase.type === 'course' && !purchase.itemThumbnail,
-      );
-
-      if (missing.length === 0) return;
-
-      const entries = await Promise.all(
-        missing.map(async (purchase) => {
-          try {
-            const course = await getCourseById(purchase.itemId);
-            const thumbnail = course?.thumbnailUrl || course?.thumbnail || '/images/course1.jpg';
-            return [purchase.itemId, thumbnail] as const;
-          } catch {
-            return [purchase.itemId, '/images/course1.jpg'] as const;
-          }
-        }),
-      );
-
-      if (active) {
-        setResolvedThumbnails((current) => ({
-          ...current,
-          ...Object.fromEntries(entries),
-        }));
-      }
-    }
-
-    resolveThumbnails();
-
-    return () => {
-      active = false;
-    };
-  }, [purchases]);
+  }, [user, userData?.purchasedCourses]);
 
   if (authLoading || !user) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-accent border-t-transparent rounded-full" /></div>;
 
@@ -119,7 +86,7 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 py-10 animate-fade-up">
         {activeTab === 'courses' ? (
           <>
-            {coursePurchases.length === 0 ? (
+            {ownedCourses.length === 0 ? (
               <div className="text-center py-20">
                 <BookOpen className="w-12 h-12 text-text-light/30 mx-auto mb-4" />
                 <h2 className="font-serif text-2xl text-primary mb-2">No Courses Yet</h2>
@@ -128,52 +95,61 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {coursePurchases.map((purchase) => (
-                  <div key={purchase.id} className="card group animate-fade-up">
-                    <div className="relative aspect-[4/3] overflow-hidden">
-                      <Image
-                        src={purchase.itemThumbnail || resolvedThumbnails[purchase.itemId] || '/images/course1.jpg'}
-                        alt={purchase.itemTitle}
-                        fill
-                        sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw"
-                        className="object-cover scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
-                      />
-                      <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
-                        <Play className="w-12 h-12 text-accent" />
-                      </div>
-                      {purchase.progress && purchase.progress >= 100 && (
-                        <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 text-xs rounded flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" /> Complete
+                {ownedCourses.map((course) => {
+                  const progress = course.totalLessons > 0
+                    ? Math.round(((userData?.lessonProgress?.[course.id]?.length || 0) / course.totalLessons) * 100)
+                    : 0;
+                  const purchaseDate = purchases.find(p => p.itemId === course.id)?.createdAt || course.createdAt;
+                  return (
+                    <div key={course.id} className="card group animate-fade-up">
+                      <div className="relative aspect-[4/3] overflow-hidden">
+                        <Image
+                          src={course.thumbnailUrl || course.thumbnail || '/images/course1.jpg'}
+                          alt={course.title}
+                          fill
+                          sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, 33vw"
+                          className="object-cover scale-[1.02] group-hover:scale-[1.06] transition-transform duration-500 ease-out"
+                        />
+                        <div className="absolute inset-0 bg-primary/30 flex items-center justify-center">
+                          <Play className="w-12 h-12 text-accent" />
                         </div>
-                      )}
+                        {progress >= 100 && (
+                          <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 text-xs rounded flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" /> Complete
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-5">
+                        <h3 className="font-serif text-lg text-primary mb-2">{course.title}</h3>
+                        <div className="flex items-center text-xs text-text-light mb-4">
+                          <Clock className="w-3 h-3 mr-1" /> Owned · {formatDate(purchaseDate)}
+                          {getCourseExpiryLabel(userData?.purchasedCourses, userData?.courseExpiry, course.id) && (
+                            <span className="ml-2 text-amber-600">· Expires {getCourseExpiryLabel(userData?.purchasedCourses, userData?.courseExpiry, course.id)}</span>
+                          )}
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex justify-between text-xs text-text-light mb-1">
+                            <span>Progress</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-2">
+                            <div
+                              className="bg-accent h-2 rounded-full transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                        </div>
+                        <Link
+                          href={`/dashboard/courses/${course.id}`}
+                          className="btn-primary w-full text-center text-sm py-2"
+                        >
+                          {progress > 0 ? 'Continue Learning' : 'Start Course'}
+                        </Link>
+                      </div>
                     </div>
-                    <div className="p-5">
-                      <h3 className="font-serif text-lg text-primary mb-2">{purchase.itemTitle}</h3>
-                      <div className="flex items-center text-xs text-text-light mb-4">
-                        <Clock className="w-3 h-3 mr-1" /> Purchased {formatDate(purchase.createdAt)}
-                      </div>
-                      {/* Progress Bar */}
-                      <div className="mb-4">
-                        <div className="flex justify-between text-xs text-text-light mb-1">
-                          <span>Progress</span>
-                          <span>{purchase.progress || 0}%</span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-2">
-                          <div
-                            className="bg-accent h-2 rounded-full transition-all"
-                            style={{ width: `${purchase.progress || 0}%` }}
-                          />
-                        </div>
-                      </div>
-                      <Link
-                        href={`/dashboard/courses/${purchase.itemId}`}
-                        className="btn-primary w-full text-center text-sm py-2"
-                      >
-                        {(purchase.progress || 0) > 0 ? 'Continue Learning' : 'Start Course'}
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

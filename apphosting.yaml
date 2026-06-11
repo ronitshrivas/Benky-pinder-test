@@ -71,7 +71,7 @@ env:
       - RUNTIME
 
   - variable: EMAIL_HOST
-    value: "smtp.gmail.com"
+    value: "smtp.office365.com"
     availability:
       - BUILD
       - RUNTIME
@@ -83,7 +83,7 @@ env:
       - RUNTIME
 
   - variable: EMAIL_USER
-    value: "pinderbecky7@gmail.com"
+    value: "becky@beckypinder.com.au"
     availability:
       - BUILD
       - RUNTIME
@@ -94,15 +94,14 @@ env:
       - BUILD
       - RUNTIME
 
-
   - variable: EMAIL_FROM
-    value: "Becky Pinder Yoga <pinderbecky7@gmail.com>"
+    value: "Becky Pinder <becky@beckypinder.com.au>"
     availability:
       - BUILD
       - RUNTIME
 
   - variable: ADMIN_EMAIL
-    value: "pinderbecky7@gmail.com"
+    value: "becky@beckypinder.com.au"
     availability:
       - BUILD
       - RUNTIME

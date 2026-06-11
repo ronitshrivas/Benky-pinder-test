@@ -65,6 +65,7 @@ export default function BlogArticlePage() {
           src={post.coverImageUrl || post.thumbnail || '/images/course1.jpg'}
           alt={post.title}
           fill
+          sizes="100vw"
           className="object-cover"
         />
         <div className="absolute inset-0 bg-primary/55" />

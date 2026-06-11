@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Users, BookOpen, Image as ImageIcon, Receipt, TrendingUp, DollarSign, Eye, MapPin, FileText, Video } from 'lucide-react';
+import { Users, BookOpen, Image as ImageIcon, Receipt, TrendingUp, DollarSign, Eye, MapPin, FileText, Video, MessageSquare, Package } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { getAdminStats } from '@/lib/firestore';
 
@@ -40,7 +40,8 @@ export default function AdminDashboard() {
   ];
 
   const adminLinks = [
-    { href: '/admin/courses', label: 'Manage Courses', icon: BookOpen, desc: 'Add, edit, delete video courses' },
+    { href: '/admin/courses', label: 'Manage Courses', icon: BookOpen, desc: 'Add, edit, delete video courses and bundles' },
+    { href: '/admin/testimonials', label: 'Testimonials', icon: MessageSquare, desc: 'Manage client testimonials' },
     { href: '/admin/retreats', label: 'Manage Retreats', icon: MapPin, desc: 'Manage retreat listings' },
     { href: '/admin/gallery', label: 'Gallery', icon: ImageIcon, desc: 'Manage photos & videos' },
     { href: '/admin/becky', label: 'About Becky', icon: FileText, desc: 'Edit Becky page copy & philosophy' },

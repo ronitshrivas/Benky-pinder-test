@@ -15,6 +15,9 @@ export interface User {
   updatedAt: string;
   purchasedCourses: string[];
   registeredRetreats: string[];
+  purchasedBundles?: string[];
+  lessonProgress?: Record<string, string[]>;
+  courseExpiry?: Record<string, string>; // courseId -> ISO expiry date (6 months from purchase)
 }
 
 export type UserData = User;
@@ -37,11 +40,13 @@ export interface Course {
   lessons: Lesson[];
   totalLessons: number;
   published: boolean;
-  status: 'published' | 'draft';
+  status: 'published' | 'draft' | 'upcoming';
   featured: boolean;
   createdAt: string;
   updatedAt: string;
   enrolledCount: number;
+  isBundle?: boolean;
+  bundledCourses?: string[];
 }
 
 export interface Lesson {
@@ -207,3 +212,15 @@ export interface DashboardStats {
 export interface BeckyPageContent {
   bioContent: string;
 }
+
+export interface Testimonial {
+  id: string;
+  name: string;
+  meta?: string;
+  rating: number;
+  text: string;
+  order: number;
+  published: boolean;
+  createdAt: string;
+}
+

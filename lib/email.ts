@@ -190,6 +190,30 @@ export async function sendOTPEmail(to: string, otp: string) {
   });
 }
 
+export async function sendPasswordResetOTPEmail(to: string, otp: string) {
+  const html = `
+    <div style="font-family: 'Montserrat', sans-serif; max-width: 600px; margin: 0 auto; background: #F8F6F0;">
+      <div style="background: #1B2A4A; padding: 30px 40px; text-align: center;">
+        <img src="${logoUrl}" alt="Becky Pinder Logo" style="max-height: 80px; max-width: 250px; display: inline-block; vertical-align: middle;" />
+      </div>
+      <div style="padding: 40px; text-align: center;">
+        <h2 style="color: #1B2A4A;">Reset Your Password</h2>
+        <p>Use the code below to reset your password:</p>
+        <div style="background: #1B2A4A; display: inline-block; padding: 15px 40px; border-radius: 8px; margin: 20px 0;">
+          <span style="color: #C9A84C; font-size: 32px; letter-spacing: 8px; font-weight: 700;">${otp}</span>
+        </div>
+        <p style="color: #6B7280; font-size: 14px;">This code expires in 10 minutes. If you didn't request a password reset, you can safely ignore this email.</p>
+      </div>
+    </div>
+  `;
+
+  await sendEmail({
+    to,
+    subject: 'Password Reset Code - Becky Pinder Yoga',
+    html,
+  });
+}
+
 export async function sendContactNotification(
   name: string,
   email: string,

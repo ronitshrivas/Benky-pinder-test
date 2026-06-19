@@ -107,6 +107,14 @@ function inferMimeType(url: string): string {
   return 'video/mp4';
 }
 
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
 function isDirectVideoUrl(url: string): boolean {
   if (!url) return false;
   const lower = url.toLowerCase();
@@ -181,7 +189,7 @@ export default function VideoPlayer({
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const [savedResumeTime, setSavedResumeTime] = useState(0);
-  const [isCastReady, setIsCastReady] = useState(false);
+  const [castState, setCastState] = useState<'loading' | 'ready' | 'unavailable' | 'ios'>('loading');
   const [isCasting, setIsCasting] = useState(false);
 
   const storageKey = `becky_pinder_lesson_progress_${userId}_${lessonId}`;
@@ -294,6 +302,14 @@ export default function VideoPlayer({
     if (castInitRef.current) return;
 
     let cancelled = false;
+
+    // iOS Safari/Chrome and many in-app browsers cannot use the web Chromecast Sender SDK.
+    // Offer AirPlay/screen-mirroring guidance instead of a broken Cast button.
+    if (isIOS()) {
+      setCastState('ios');
+      return;
+    }
+
     const attemptInit = () => {
       const w = window as any;
       if (!w.cast?.framework?.CastContext || !w.chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID) {
@@ -306,8 +322,22 @@ export default function VideoPlayer({
           receiverApplicationId: w.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
           autoJoinPolicy: w.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
         });
+
+        // Keep casting UI in sync if the user stops casting from the device picker.
+        try {
+          castContext.addEventListener(
+            w.cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+            (event: any) => {
+              const sessionState = event?.sessionState;
+              setIsCasting(sessionState === w.cast.framework.SessionState.CASTING);
+            }
+          );
+        } catch {
+          // Non-fatal: session listener is optional.
+        }
+
         castInitRef.current = true;
-        setIsCastReady(true);
+        setCastState('ready');
         return true;
       } catch {
         return false;
@@ -322,16 +352,36 @@ export default function VideoPlayer({
       if (cancelled) return;
       if (attemptInit()) {
         clearInterval(interval);
+        clearTimeout(timeout);
       }
     }, 500);
+
+    // Stop polling after 10s if the SDK never loads (ad blocker, unsupported browser, network).
+    const timeout = window.setTimeout(() => {
+      if (cancelled) return;
+      clearInterval(interval);
+      if (!castInitRef.current) {
+        setCastState('unavailable');
+      }
+    }, 10000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      clearTimeout(timeout);
     };
   }, []);
 
   const handleCast = async () => {
+    // iOS browsers do not expose the web Chromecast Sender SDK. Guide the user.
+    if (isIOS()) {
+      toast(
+        'On iPhone, open the fullscreen player and tap the AirPlay icon, or mirror your screen with the Google Home app.',
+        { icon: '📱', duration: 6000 }
+      );
+      return;
+    }
+
     const mediaUrl = resolvedMedia?.castUrl || '';
     if (!mediaUrl) {
       toast.error('Chromecast is not available for this video source.');
@@ -341,16 +391,21 @@ export default function VideoPlayer({
     const w = window as any;
     const castContext = w.cast?.framework?.CastContext?.getInstance?.();
     if (!castContext) {
-      toast.error('Chromecast is still loading. Please try again in a moment.');
+      if (castState === 'loading') {
+        toast('Chromecast is still loading. Please try again in a moment.');
+      } else {
+        toast.error('Chromecast is not available on this browser. Please use Google Chrome or a Chromecast-supported browser.');
+      }
       return;
     }
 
     try {
-      if (!castContext.getCurrentSession()) {
+      let session = castContext.getCurrentSession();
+      if (!session) {
         await castContext.requestSession();
+        session = castContext.getCurrentSession();
       }
 
-      const session = castContext.getCurrentSession();
       if (!session) {
         throw new Error('No Cast session available.');
       }
@@ -373,10 +428,17 @@ export default function VideoPlayer({
       setIsCasting(true);
       resetControlsTimer();
       toast.success('Casting to your TV');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chromecast failed:', error);
       setIsCasting(false);
-      toast.error('Unable to start Chromecast.');
+      // Provide a clearer message for common failures.
+      if (error?.code === 'cancel' || error?.message?.toLowerCase().includes('cancel')) {
+        toast('Casting cancelled.');
+      } else if (error?.code === 'timeout' || error?.message?.toLowerCase().includes('timeout')) {
+        toast.error('Could not find a Chromecast device in time. Make sure your TV and phone are on the same Wi-Fi.');
+      } else {
+        toast.error('Unable to start Chromecast. Make sure your device and TV are on the same Wi-Fi network.');
+      }
     }
   };
 
@@ -849,12 +911,11 @@ export default function VideoPlayer({
         {canCast && (
           <button
             onClick={handleCast}
-            disabled={!isCastReady}
-            className="absolute right-3 top-3 z-20 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/85 disabled:cursor-not-allowed disabled:opacity-50"
-            title="Cast to TV"
+            className="absolute right-3 top-3 z-30 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/85 pointer-events-auto"
+            title={castState === 'ios' ? 'Cast options for iPhone' : isCasting ? 'Casting to TV' : 'Cast to TV'}
           >
-            <Cast className="h-4 w-4" />
-            Cast
+            <Cast className={`h-4 w-4 ${isCasting ? 'text-accent' : ''}`} />
+            {castState === 'ios' ? 'Cast' : castState === 'loading' ? 'Cast' : castState === 'unavailable' ? 'Cast' : isCasting ? 'Casting' : 'Cast'}
           </button>
         )}
         <iframe
@@ -879,12 +940,11 @@ export default function VideoPlayer({
       {canCast && (
         <button
           onClick={handleCast}
-          disabled={!isCastReady}
-          className="absolute right-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/80 disabled:cursor-not-allowed disabled:opacity-50"
-          title="Cast to TV"
+          className="absolute right-4 top-4 z-30 inline-flex items-center gap-2 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/80 pointer-events-auto"
+          title={castState === 'ios' ? 'Cast options for iPhone' : isCasting ? 'Casting to TV' : 'Cast to TV'}
         >
-          <Cast className="h-4 w-4" />
-          Cast
+          <Cast className={`h-4 w-4 ${isCasting ? 'text-accent' : ''}`} />
+          {castState === 'ios' ? 'Cast' : castState === 'loading' ? 'Cast' : castState === 'unavailable' ? 'Cast' : isCasting ? 'Casting' : 'Cast'}
         </button>
       )}
       {/* 1. Actual Video Element */}
@@ -896,6 +956,7 @@ export default function VideoPlayer({
         controlsList="nodownload"
         playsInline
         webkit-playsinline="true"
+        x-webkit-airplay="allow"
         onClick={handleVideoClick}
         className="w-full h-full object-contain cursor-pointer"
         style={{

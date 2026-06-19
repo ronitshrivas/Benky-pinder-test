@@ -271,7 +271,7 @@ export default function HomePage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     height: '38px',
-                    width: '150px',
+                    width: '160px',
                     padding: '0 12px',
                     border: '1px solid #C9A84C',
                     color: 'black',
@@ -294,7 +294,7 @@ export default function HomePage() {
                     (e.currentTarget as HTMLAnchorElement).style.color = '#1B2A4A';
                   }}
                 >
-                  EXPLORE NOW
+                  EXPLORE RETREATS
                 </a>
 
                 <a
@@ -548,12 +548,12 @@ export default function HomePage() {
       </section> */}
 
       {/* 7. Student Stories (Testimonials) */}
-      <section className="bg-primary-pale py-24">
+      <section id="client-stories" className="scroll-mt-24 bg-primary-pale py-24">
         <div className="container mx-auto px-6">
           <div className="mb-16 text-center">
-            <span className="section-label">Student Stories</span>
+            <span className="section-label">Client Stories</span>
             <div className="mx-auto mb-6 h-0.5 w-12 bg-accent" />
-            <h2 className="section-title text-primary">What Students Say</h2>
+            <h2 className="section-title text-primary">What Clients Say</h2>
           </div>
           <div className="grid gap-8 md:grid-cols-2 xl:grid-cols-3">
             {dynamicTestimonials.map((t, i) => (
@@ -602,7 +602,7 @@ export default function HomePage() {
           <span className="section-label !text-accent-light">Stay Connected</span>
           <h2 className="section-title mb-4 text-white">Join Becky's Inner Circle</h2>
           <p className="mb-10 text-white/80">
-            Recieve a complimentary 10 minute radiance boost  morning practice.<br />
+            Receive a complimentary 10 minute radiance boost  morning practice.<br />
             Early access to retreats
             Delivered to your inbox
           </p>

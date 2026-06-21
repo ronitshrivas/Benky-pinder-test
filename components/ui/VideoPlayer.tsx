@@ -162,6 +162,7 @@ export default function VideoPlayer({
     castUrl: string;
     mimeType: string;
     provider: 'youtube' | 'vimeo' | 'wistia' | 'bunny' | null;
+    poster?: string;
   } | null>(null);
   const [isResolvingMedia, setIsResolvingMedia] = useState(true);
 
@@ -191,6 +192,7 @@ export default function VideoPlayer({
   const [savedResumeTime, setSavedResumeTime] = useState(0);
   const [castState, setCastState] = useState<'loading' | 'ready' | 'unavailable' | 'ios'>('loading');
   const [isCasting, setIsCasting] = useState(false);
+  const [isAirPlayAvailable, setIsAirPlayAvailable] = useState(false);
 
   const storageKey = `becky_pinder_lesson_progress_${userId}_${lessonId}`;
   const activeMediaSrc = resolvedMedia?.src || src;
@@ -228,20 +230,49 @@ export default function VideoPlayer({
               const fallbackUrl = typeof data?.fallbackUrl === 'string' ? data.fallbackUrl : '';
               const originalUrl = typeof data?.originalUrl === 'string' ? data.originalUrl : '';
               const playlistUrl = typeof data?.videoPlaylistUrl === 'string' ? data.videoPlaylistUrl : '';
+              const thumbnailUrl = typeof data?.thumbnailUrl === 'string' ? data.thumbnailUrl : '';
               const hasMp4 = Boolean(data?.hasMP4Fallback);
               const isPlayable = Boolean(data?.isPlayable);
+              const isPlaylistPlayable = Boolean(data?.isPlaylistPlayable);
 
               // Always use iframe embed for Bunny — it's 100% reliable.
-              // Keep castUrl so Chromecast can stream the HLS/MP4 directly to the TV.
-              const castUrl = fallbackUrl || playlistUrl || originalUrl;
+              // For Chromecast, prefer the MP4 fallback (single file, best receiver support),
+              // then the HLS playlist, then the original file.
+              let castUrl = '';
+              let castMimeType = '';
+
+              if (fallbackUrl && hasMp4) {
+                castUrl = fallbackUrl;
+                castMimeType = inferMimeType(fallbackUrl);
+              } else if (playlistUrl && isPlaylistPlayable) {
+                castUrl = playlistUrl;
+                castMimeType = inferMimeType(playlistUrl);
+              } else if (fallbackUrl) {
+                castUrl = fallbackUrl;
+                castMimeType = inferMimeType(fallbackUrl);
+              } else if (originalUrl && isPlayable) {
+                castUrl = originalUrl;
+                castMimeType = inferMimeType(originalUrl);
+              }
+
+              if (castUrl) {
+                console.log('[VideoPlayer] Bunny cast URL selected:', castUrl, 'mimeType:', castMimeType);
+              }
+
+              // On iPhone/iPad the Bunny iframe player often AirPlays audio-only to the TV
+              // because the AirPlay session is handled inside the iframe. Using the native
+              // <video> element with the direct HLS/MP4 URL lets iOS send the full video
+              // stream to an AirPlay receiver reliably.
+              const useNativeVideoOnIOS = isIOS() && castUrl;
 
               if (!cancelled) {
                 setResolvedMedia({
-                  kind: 'iframe',
-                  src: embedUrl || src,
+                  kind: useNativeVideoOnIOS ? 'video' : 'iframe',
+                  src: useNativeVideoOnIOS ? castUrl : embedUrl || src,
                   castUrl,
-                  mimeType: fallbackUrl ? inferMimeType(fallbackUrl) : playlistUrl ? inferMimeType(playlistUrl) : originalUrl ? inferMimeType(originalUrl) : '',
+                  mimeType: castMimeType,
                   provider: 'bunny',
+                  poster: thumbnailUrl || undefined,
                 });
                 setIsResolvingMedia(false);
               }
@@ -310,8 +341,42 @@ export default function VideoPlayer({
       return;
     }
 
-    const attemptInit = () => {
-      const w = window as any;
+    const w = window as any;
+
+    const attachListeners = (castContext: any) => {
+      try {
+        const SessionState = w.cast.framework.SessionState;
+        const CastState = w.cast.framework.CastState;
+
+        castContext.addEventListener(
+          w.cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+          (event: any) => {
+            const state = event?.sessionState;
+            const connected = state === SessionState.SESSION_STARTED || state === SessionState.SESSION_RESUMED;
+            setIsCasting(connected);
+          }
+        );
+
+        castContext.addEventListener(
+          w.cast.framework.CastContextEventType.CAST_STATE_CHANGED,
+          (event: any) => {
+            const state = event?.castState;
+            if (state === CastState.NO_DEVICES_AVAILABLE) {
+              setCastState('unavailable');
+            } else if (state === CastState.CONNECTED) {
+              setIsCasting(true);
+            } else {
+              // NOT_CONNECTED or CONNECTING — SDK is usable.
+              setCastState('ready');
+            }
+          }
+        );
+      } catch (err) {
+        console.log('[VideoPlayer] Cast listener setup failed:', err);
+      }
+    };
+
+    const doInit = () => {
       if (!w.cast?.framework?.CastContext || !w.chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID) {
         return false;
       }
@@ -319,65 +384,82 @@ export default function VideoPlayer({
       try {
         const castContext = w.cast.framework.CastContext.getInstance();
         castContext.setOptions({
-          receiverApplicationId: w.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-          autoJoinPolicy: w.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+          receiverApplicationId: w.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID || 'CC1AD845',
+          autoJoinPolicy: w.chrome.cast.AutoJoinPolicy?.ORIGIN_SCOPED || 'origin_scoped',
         });
 
-        // Keep casting UI in sync if the user stops casting from the device picker.
-        try {
-          castContext.addEventListener(
-            w.cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
-            (event: any) => {
-              const sessionState = event?.sessionState;
-              setIsCasting(sessionState === w.cast.framework.SessionState.CASTING);
-            }
-          );
-        } catch {
-          // Non-fatal: session listener is optional.
-        }
+        attachListeners(castContext);
 
         castInitRef.current = true;
         setCastState('ready');
         return true;
-      } catch {
+      } catch (err) {
+        console.log('[VideoPlayer] Cast init failed:', err);
         return false;
       }
     };
 
-    if (attemptInit()) {
+    // Use Google's official callback if the SDK loads after this effect runs.
+    const castApiReady = () => {
+      if (cancelled) return;
+      doInit();
+    };
+    w.__castApiReady = castApiReady;
+
+    // If the SDK already loaded before this effect ran, init immediately.
+    if (w.__castApiAvailable && doInit()) {
       return;
     }
 
+    // Fallback polling for environments where the callback is unreliable.
     const interval = window.setInterval(() => {
       if (cancelled) return;
-      if (attemptInit()) {
+      if (doInit()) {
         clearInterval(interval);
         clearTimeout(timeout);
       }
     }, 500);
 
-    // Stop polling after 10s if the SDK never loads (ad blocker, unsupported browser, network).
+    // Stop polling after 15s if the SDK never loads (ad blocker, unsupported browser, network).
     const timeout = window.setTimeout(() => {
       if (cancelled) return;
       clearInterval(interval);
       if (!castInitRef.current) {
         setCastState('unavailable');
       }
-    }, 10000);
+    }, 15000);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
       clearTimeout(timeout);
+      if (w.__castApiReady === castApiReady) w.__castApiReady = undefined;
     };
   }, []);
 
   const handleCast = async () => {
-    // iOS browsers do not expose the web Chromecast Sender SDK. Guide the user.
+    // iOS browsers do not expose the web Chromecast Sender SDK.
+    // If we are playing in the native <video> element, open the system AirPlay
+    // video picker so the receiver plays the actual video stream instead of
+    // mirroring the screen (which often gives audio-only for website video).
     if (isIOS()) {
+      const video = videoRef.current;
+      const webkitVideo = video as any;
+      if (webkitVideo && typeof webkitVideo.webkitShowPlaybackTargetPicker === 'function') {
+        try {
+          console.log('[VideoPlayer] Opening iOS AirPlay video picker for URL:', video?.currentSrc || video?.src);
+          webkitVideo.webkitShowPlaybackTargetPicker();
+          return;
+        } catch (err) {
+          console.log('[VideoPlayer] AirPlay picker failed:', err);
+        }
+      }
+
+      // The AirPlay picker is not available in this browser/video state.
+      // Guide the user to the most reliable fallback: native fullscreen AirPlay.
       toast(
-        'On iPhone, open the fullscreen player and tap the AirPlay icon, or mirror your screen with the Google Home app.',
-        { icon: '📱', duration: 6000 }
+        'On iPhone, tap the video to enter fullscreen, then tap the AirPlay icon and choose your receiver. Avoid Control Center screen mirroring.',
+        { icon: '📱', duration: 8000 }
       );
       return;
     }
@@ -385,6 +467,29 @@ export default function VideoPlayer({
     const mediaUrl = resolvedMedia?.castUrl || '';
     if (!mediaUrl) {
       toast.error('Chromecast is not available for this video source.');
+      return;
+    }
+
+    // Reject obviously invalid values that occasionally come from APIs.
+    if (mediaUrl.toLowerCase() === 'null' || mediaUrl.toLowerCase() === 'undefined') {
+      console.error('[VideoPlayer] Invalid castUrl value:', mediaUrl);
+      toast.error('This video cannot be cast. The streaming URL is missing.');
+      return;
+    }
+
+    // Make sure the URL is well-formed and HTTPS before asking the TV to play it.
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(mediaUrl);
+    } catch {
+      console.error('[VideoPlayer] Malformed castUrl:', mediaUrl);
+      toast.error('This video cannot be cast. The streaming URL is invalid.');
+      return;
+    }
+
+    if (parsedUrl.protocol !== 'https:') {
+      console.error('[VideoPlayer] Cast URL is not HTTPS:', mediaUrl);
+      toast.error('Chromecast requires a secure HTTPS video URL.');
       return;
     }
 
@@ -399,6 +504,14 @@ export default function VideoPlayer({
       return;
     }
 
+    if (castState === 'unavailable') {
+      toast.error('No Chromecast devices found. Make sure your phone and TV are on the same Wi-Fi network and that the TV is awake.');
+      return;
+    }
+
+    const castMimeType = resolvedMedia?.mimeType || inferMimeType(mediaUrl);
+    console.log('[VideoPlayer] Starting Chromecast:', { mediaUrl, mimeType: castMimeType, provider: resolvedMedia?.provider });
+
     try {
       let session = castContext.getCurrentSession();
       if (!session) {
@@ -410,10 +523,10 @@ export default function VideoPlayer({
         throw new Error('No Cast session available.');
       }
 
-      const mediaInfo = new w.chrome.cast.media.MediaInfo(
-        mediaUrl,
-        resolvedMedia?.mimeType || inferMimeType(mediaUrl)
-      );
+      const mediaInfo = new w.chrome.cast.media.MediaInfo(mediaUrl, castMimeType);
+      // VOD content should be BUFFERED so the receiver can seek and buffer correctly.
+      mediaInfo.streamType = w.chrome.cast.media.StreamType.BUFFERED;
+
       const metadata = new w.chrome.cast.media.GenericMediaMetadata();
       metadata.title = title || (resolvedMedia?.provider === 'bunny' ? 'Becky Pinder Yoga' : `Lesson ${lessonId}`);
       if (poster) {
@@ -423,21 +536,37 @@ export default function VideoPlayer({
 
       const loadRequest = new w.chrome.cast.media.LoadRequest(mediaInfo);
       loadRequest.autoplay = true;
+      loadRequest.currentTime = videoRef.current?.currentTime || 0;
 
+      // Pause the local player while casting.
+      videoRef.current?.pause();
+
+      // CAF CastSession.loadMedia() returns a Promise in the current SDK.
       await session.loadMedia(loadRequest);
+
       setIsCasting(true);
       resetControlsTimer();
       toast.success('Casting to your TV');
     } catch (error: any) {
-      console.error('Chromecast failed:', error);
+      console.error('[VideoPlayer] Chromecast failed:', error);
       setIsCasting(false);
-      // Provide a clearer message for common failures.
-      if (error?.code === 'cancel' || error?.message?.toLowerCase().includes('cancel')) {
+
+      const code = error?.code || error?.errorCode || '';
+      const message = (error?.message || error?.description || '').toLowerCase();
+      const codeStr = String(code).toLowerCase();
+
+      if (codeStr.includes('cancel') || message.includes('cancel')) {
         toast('Casting cancelled.');
-      } else if (error?.code === 'timeout' || error?.message?.toLowerCase().includes('timeout')) {
-        toast.error('Could not find a Chromecast device in time. Make sure your TV and phone are on the same Wi-Fi.');
+      } else if (codeStr.includes('timeout') || message.includes('timeout')) {
+        toast.error('Could not find a Chromecast device. Make sure your phone and TV are on the same Wi-Fi network and no VPN is active.');
+      } else if (codeStr.includes('session') || message.includes('session')) {
+        toast.error('Could not connect to the Chromecast device. Please restart the Cast app on your TV and try again.');
+      } else if (codeStr.includes('network') || message.includes('network')) {
+        toast.error('Network error. Make sure your phone and TV are on the same Wi-Fi network.');
+      } else if (message.includes('load') || message.includes('media') || codeStr.includes('load_failed')) {
+        toast.error('The TV could not play this video. The file format may not be supported.');
       } else {
-        toast.error('Unable to start Chromecast. Make sure your device and TV are on the same Wi-Fi network.');
+        toast.error(`Chromecast failed: ${code || 'unknown error'}`);
       }
     }
   };
@@ -510,7 +639,25 @@ export default function VideoPlayer({
     };
   }, []);
 
-  // 1d. Stall Recovery Watchdog: nudge video forward slightly if it stays stuck buffering (fast 1.8s trigger)
+  // 1d. Detect AirPlay route availability on iOS so the Cast button can trigger the video picker.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleAirPlayAvailability = (event: any) => {
+      setIsAirPlayAvailable(event?.availability === 'available');
+    };
+
+    if (typeof (video as any).webkitShowPlaybackTargetPicker === 'function') {
+      video.addEventListener('webkitplaybacktargetavailabilitychanged', handleAirPlayAvailability);
+    }
+
+    return () => {
+      video.removeEventListener('webkitplaybacktargetavailabilitychanged', handleAirPlayAvailability);
+    };
+  }, [activeMediaSrc]);
+
+  // 1e. Stall Recovery Watchdog: nudge video forward slightly if it stays stuck buffering (fast 1.8s trigger)
   useEffect(() => {
     let stallTimer: NodeJS.Timeout;
     if (isBuffering && isPlaying) {
@@ -912,7 +1059,7 @@ export default function VideoPlayer({
           <button
             onClick={handleCast}
             className="absolute right-3 top-3 z-30 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/85 pointer-events-auto"
-            title={castState === 'ios' ? 'Cast options for iPhone' : isCasting ? 'Casting to TV' : 'Cast to TV'}
+            title={castState === 'ios' ? (resolvedMedia?.kind === 'video' ? 'AirPlay to TV' : 'Cast options for iPhone') : isCasting ? 'Casting to TV' : 'Cast to TV'}
           >
             <Cast className={`h-4 w-4 ${isCasting ? 'text-accent' : ''}`} />
             {castState === 'ios' ? 'Cast' : castState === 'loading' ? 'Cast' : castState === 'unavailable' ? 'Cast' : isCasting ? 'Casting' : 'Cast'}
@@ -941,7 +1088,7 @@ export default function VideoPlayer({
         <button
           onClick={handleCast}
           className="absolute right-4 top-4 z-30 inline-flex items-center gap-2 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/80 pointer-events-auto"
-          title={castState === 'ios' ? 'Cast options for iPhone' : isCasting ? 'Casting to TV' : 'Cast to TV'}
+          title={castState === 'ios' ? (resolvedMedia?.kind === 'video' ? 'AirPlay to TV' : 'Cast options for iPhone') : isCasting ? 'Casting to TV' : 'Cast to TV'}
         >
           <Cast className={`h-4 w-4 ${isCasting ? 'text-accent' : ''}`} />
           {castState === 'ios' ? 'Cast' : castState === 'loading' ? 'Cast' : castState === 'unavailable' ? 'Cast' : isCasting ? 'Casting' : 'Cast'}
@@ -951,7 +1098,7 @@ export default function VideoPlayer({
       <video
         ref={videoRef}
         src={currentVideoSrc}
-        poster={poster}
+        poster={resolvedMedia?.poster || poster}
         preload="auto"
         controlsList="nodownload"
         playsInline
@@ -986,8 +1133,8 @@ export default function VideoPlayer({
 
           // Native video failed — log for debugging but keep the error toast for non-Bunny sources
           if (resolvedMedia?.provider === 'bunny') {
-            // Bunny always uses iframe now, so this branch shouldn't fire.
-            // If it does, silently switch to embed without nagging the user.
+            // Bunny uses native video on iOS for AirPlay and iframe everywhere else.
+            // If the native URL fails, fall back to the iframe embed without nagging the user.
             if (embedUrl && resolvedMedia?.kind !== 'iframe') {
               setResolvedMedia({
                 ...resolvedMedia,

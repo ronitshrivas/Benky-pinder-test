@@ -17,6 +17,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        {/* Register the Cast SDK availability callback BEFORE the SDK script loads. */}
+        <Script
+          id="cast-api-callback"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.__onGCastApiAvailable = function(isAvailable) {
+                window.__castApiAvailable = isAvailable;
+                if (isAvailable && typeof window.__castApiReady === 'function') {
+                  window.__castApiReady();
+                }
+              };
+            `,
+          }}
+        />
         <Script
           src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"
           strategy="afterInteractive"

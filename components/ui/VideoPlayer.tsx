@@ -205,12 +205,19 @@ export default function VideoPlayer({
 
   // Native AirPlay / Google Cast hook. Pass the direct media URL so
   // Chromecast receives a playable file rather than an iframe page.
-  const { airplaySupported, openAirplayPicker, castAvailable, castState, startCast, stopCast } = useCasting(
+  const { airplaySupported, openAirplayPicker, castAvailable, castState, castErrorMessage, startCast, stopCast } = useCasting(
     videoRef,
     resolvedMedia?.castUrl || activeMediaSrc,
     title || 'Becky Pinder Video',
     resolvedMedia?.mimeType
   );
+
+  // Show a toast whenever casting fails so the user always gets feedback
+  useEffect(() => {
+    if (castState === 'error' && castErrorMessage) {
+      toast.error(castErrorMessage, { duration: 7000, id: 'cast-error' });
+    }
+  }, [castState, castErrorMessage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -364,6 +371,11 @@ export default function VideoPlayer({
       return;
     }
 
+    if (castState === 'connecting') {
+      // Already in progress, don't re-trigger
+      return;
+    }
+
     // iOS Safari/Chrome uses the native AirPlay video picker when a
     // <video> element is available. Otherwise fall back to guidance.
     if (isIOS()) {
@@ -390,21 +402,44 @@ export default function VideoPlayer({
         // Warn the user when we don't have an MP4 so they know the limitation.
         if (resolvedMedia?.castUrl && !isMp4Url(resolvedMedia.castUrl)) {
           toast(
-            'This lesson is using an HLS stream. Some AirPlay receivers only play audio. Enable MP4 fallback in Bunny for best TV compatibility.',
+            'This lesson uses an HLS stream. Some AirPlay receivers play audio only. Enable MP4 fallback in Bunny for best TV compatibility.',
             { icon: '⚠️', duration: 7000 }
           );
         }
       } else {
         toast(
-          'On iPhone, tap the video to enter fullscreen, then tap the AirPlay icon and choose your receiver. Avoid Control Center screen mirroring.',
+          'On iPhone, tap the video to enter fullscreen, then tap the AirPlay icon and choose your receiver.',
           { icon: '📱', duration: 8000 }
         );
       }
       return;
     }
 
+    // If there's no direct video URL we can send to Chromecast, guide the user
+    // to use the browser's built-in screen casting instead.
+    if (!resolvedMedia?.castUrl) {
+      toast(
+        'To cast this video to your TV: in Chrome, click the ⋮ menu → Cast → choose your TV.',
+        { icon: '📺', duration: 8000 }
+      );
+      return;
+    }
+
     if (!castAvailable) {
-      toast.error('Chromecast is not available. Please use Google Chrome on Android or desktop.');
+      const isChrome = typeof navigator !== 'undefined' &&
+        /Chrome/.test(navigator.userAgent) &&
+        !/Edg|OPR|Brave/.test(navigator.userAgent);
+      if (isChrome) {
+        toast(
+          'Chromecast is initialising. Please wait a moment and try again, or use Chrome menu → Cast.',
+          { icon: '⏳', duration: 6000 }
+        );
+      } else {
+        toast(
+          'For Chromecast, open this page in Google Chrome. For Apple TV, use Safari on iPhone/Mac.',
+          { icon: '📺', duration: 8000 }
+        );
+      }
       return;
     }
 
@@ -919,16 +954,49 @@ export default function VideoPlayer({
         ref={playerContainerRef}
         className="relative w-full h-full bg-black rounded-lg overflow-hidden shadow-xl border border-white/5 aspect-video"
       >
-        {canCast && (
-          <button
-            onClick={handleCast}
-            className="absolute right-3 top-3 z-30 inline-flex items-center gap-2 rounded-full bg-black/70 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/85 pointer-events-auto"
-            title={castState === 'connected' ? 'Casting to TV' : isIOS() ? (airplaySupported ? 'AirPlay to TV' : 'Cast options for iPhone') : 'Cast to TV'}
-          >
-            <Cast className={`h-4 w-4 ${castState === 'connected' ? 'text-accent' : ''}`} />
-            {castState === 'connected' ? 'Casting' : 'Cast'}
-          </button>
-        )}
+        <button
+          onClick={handleCast}
+          disabled={castState === 'connecting'}
+          className={`absolute right-3 top-3 z-30 inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur pointer-events-auto transition-colors ${
+            castState === 'connected'
+              ? 'bg-accent/80 hover:bg-accent'
+              : castState === 'connecting'
+              ? 'bg-black/60 cursor-wait'
+              : castState === 'error'
+              ? 'bg-red-900/70 hover:bg-red-800/80'
+              : 'bg-black/70 hover:bg-black/85'
+          }`}
+          title={
+            castState === 'connected'
+              ? 'Stop casting'
+              : castState === 'connecting'
+              ? 'Connecting to TV…'
+              : isIOS()
+              ? airplaySupported
+                ? 'AirPlay to TV'
+                : 'Cast options for iPhone'
+              : 'Cast to TV'
+          }
+        >
+          <Cast
+            className={`h-4 w-4 ${
+              castState === 'connected'
+                ? 'text-primary'
+                : castState === 'connecting'
+                ? 'animate-pulse text-yellow-300'
+                : castState === 'error'
+                ? 'text-red-300'
+                : ''
+            }`}
+          />
+          {castState === 'connected'
+            ? 'Casting'
+            : castState === 'connecting'
+            ? 'Connecting…'
+            : castState === 'error'
+            ? 'Retry Cast'
+            : 'Cast to TV'}
+        </button>
         <CastDebugPanel />
         <iframe
           src={currentVideoSrc}
@@ -950,16 +1018,49 @@ export default function VideoPlayer({
       onMouseLeave={() => isPlaying && setIsControlsVisible(false)}
       className="relative w-full h-full bg-black flex items-center justify-center select-none overflow-hidden group shadow-xl border border-white/5 rounded-lg"
     >
-      {canCast && (
-        <button
-          onClick={handleCast}
-          className="absolute right-4 top-4 z-30 inline-flex items-center gap-2 rounded-full bg-black/65 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur hover:bg-black/80 pointer-events-auto"
-          title={castState === 'connected' ? 'Casting to TV' : isIOS() ? (airplaySupported ? 'AirPlay to TV' : 'Cast options for iPhone') : 'Cast to TV'}
-        >
-          <Cast className={`h-4 w-4 ${castState === 'connected' ? 'text-accent' : ''}`} />
-          {castState === 'connected' ? 'Casting' : 'Cast'}
-        </button>
-      )}
+      <button
+        onClick={handleCast}
+        disabled={castState === 'connecting'}
+        className={`absolute right-4 top-4 z-30 inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white backdrop-blur pointer-events-auto transition-colors ${
+          castState === 'connected'
+            ? 'bg-accent/80 hover:bg-accent'
+            : castState === 'connecting'
+            ? 'bg-black/60 cursor-wait'
+            : castState === 'error'
+            ? 'bg-red-900/70 hover:bg-red-800/80'
+            : 'bg-black/65 hover:bg-black/80'
+        }`}
+        title={
+          castState === 'connected'
+            ? 'Stop casting'
+            : castState === 'connecting'
+            ? 'Connecting to TV…'
+            : isIOS()
+            ? airplaySupported
+              ? 'AirPlay to TV'
+              : 'Cast options for iPhone'
+            : 'Cast to TV'
+        }
+      >
+        <Cast
+          className={`h-4 w-4 ${
+            castState === 'connected'
+              ? 'text-primary'
+              : castState === 'connecting'
+              ? 'animate-pulse text-yellow-300'
+              : castState === 'error'
+              ? 'text-red-300'
+              : ''
+          }`}
+        />
+        {castState === 'connected'
+          ? 'Casting'
+          : castState === 'connecting'
+          ? 'Connecting…'
+          : castState === 'error'
+          ? 'Retry Cast'
+          : 'Cast to TV'}
+      </button>
       <CastDebugPanel />
       {/* 1. Actual Video Element */}
       <video

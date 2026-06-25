@@ -43,6 +43,7 @@ export function useCasting(
   const [castAvailable, setCastAvailable] = useState(false);
   const [castSession, setCastSession] = useState<any>(null);
   const [castState, setCastState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
+  const [castErrorMessage, setCastErrorMessage] = useState<string | null>(null);
   const castContextRef = useRef<any>(null);
 
   // ---------- AirPlay setup ----------
@@ -146,8 +147,13 @@ export function useCasting(
 
   const startCast = useCallback(async () => {
     const context = castContextRef.current;
-    if (!context) return;
+    if (!context) {
+      setCastErrorMessage('Cast SDK not ready. Please refresh the page and try again in a few seconds.');
+      setCastState('error');
+      return;
+    }
     setCastState('connecting');
+    setCastErrorMessage(null);
     try {
       await context.requestSession();
       const session = context.getCurrentSession();
@@ -169,15 +175,28 @@ export function useCasting(
         // Pause local playback since the TV is now the active screen.
         video?.pause();
         setCastState('connected');
+        setCastErrorMessage(null);
+      } else if (!videoSrc) {
+        setCastErrorMessage('No video URL available to cast.');
+        setCastState('error');
+      } else {
+        setCastErrorMessage('Could not start cast session. Make sure your Chromecast is powered on and on the same Wi-Fi network.');
+        setCastState('error');
       }
     } catch (err: any) {
       // err is "cancel" if the user just closes the device picker — not
       // a real error, so don't surface it as one.
       if (err !== 'cancel') {
         console.error('Cast session failed:', err);
+        const msg =
+          typeof err === 'string'
+            ? err
+            : err?.description || err?.message || 'Cast failed. Make sure your Chromecast is on the same Wi-Fi network as this device.';
+        setCastErrorMessage(msg);
         setCastState('error');
       } else {
         setCastState('idle');
+        setCastErrorMessage(null);
       }
     }
   }, [videoSrc, videoTitle, mimeType, videoRef]);
@@ -197,6 +216,7 @@ export function useCasting(
     openAirplayPicker,
     castAvailable,
     castState,
+    castErrorMessage,
     castSession,
     startCast,
     stopCast,

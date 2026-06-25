@@ -11,28 +11,6 @@ function inferMimeType(url: string): string {
   return 'video/mp4';
 }
 
-/**
- * useCasting
- *
- * Wires up two completely separate native casting systems against one
- * <video> element:
- *
- *  1. AirPlay (iPhone/iPad/Mac/Safari)
- *     - No SDK needed. WebKit exposes `webkitShowPlaybackTargetPicker()`
- *       directly on the HTMLVideoElement.
- *     - Only appears in Safari/WebKit-based browsers. Chrome on iOS still
- *       uses WebKit under the hood, so it generally works there too.
- *     - Requires the video to be playable inline and served over HTTPS.
- *
- *  2. Google Cast (Android/Chrome/desktop Chrome)
- *     - Requires the Cast SDK script (loaded in layout.tsx) and the
- *       `window.__onGCastApiAvailable` global callback.
- *     - You request a session, then load media onto the receiver by URL.
- *       The TV/Chromecast fetches the video directly — your phone is just
- *       a remote control. This means the video URL must be a direct,
- *       public, HTTPS-reachable file (mp4/webm/hls), not a blob: or
- *       file: URL, and not something behind auth headers.
- */
 export function useCasting(
   videoRef: RefObject<HTMLVideoElement>,
   videoSrc: string,
@@ -46,9 +24,7 @@ export function useCasting(
   const [castErrorMessage, setCastErrorMessage] = useState<string | null>(null);
   const castContextRef = useRef<any>(null);
 
-  // ---------- AirPlay setup ----------
-  // Re-run whenever the source changes so the hook can re-detect the picker
-  // on the (possibly newly mounted) <video> element.
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) {
@@ -63,10 +39,7 @@ export function useCasting(
     if (!supported) return;
 
     const onAvailabilityChange = (e: any) => {
-      // e.availability is a boolean: whether AirPlay targets exist nearby.
-      // We keep the button visible regardless, since detection isn't
-      // reliable on all iOS versions and the system picker handles the
-      // "no devices found" case itself.
+  
     };
 
     video.addEventListener('webkitplaybacktargetavailabilitychanged', onAvailabilityChange as EventListener);
@@ -81,7 +54,6 @@ export function useCasting(
     }
   }, [videoRef]);
 
-  // ---------- Google Cast setup ----------
   useEffect(() => {
     let cancelled = false;
     let pollId: number | null = null;
@@ -124,14 +96,10 @@ export function useCasting(
       return true;
     };
 
-    // Always register the callback, in case the script loads/reloads later.
     (window as any).__onGCastApiAvailable = (isAvailable: boolean) => {
       if (isAvailable) initCast();
     };
 
-    // Don't just wait for the callback — poll directly too, in case the
-    // script already called __onGCastApiAvailable before this effect ran
-    // (e.g. on fast reloads, or if React mounted after the script fired).
     if (!initCast()) {
       pollId = window.setInterval(() => {
         if (initCast() || cancelled) window.clearInterval(pollId!);
@@ -184,8 +152,7 @@ export function useCasting(
         setCastState('error');
       }
     } catch (err: any) {
-      // err is "cancel" if the user just closes the device picker — not
-      // a real error, so don't surface it as one.
+
       if (err !== 'cancel') {
         console.error('Cast session failed:', err);
         const msg =

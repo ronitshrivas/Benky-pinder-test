@@ -205,7 +205,17 @@ export default function VideoPlayer({
 
   // Native AirPlay / Google Cast hook. Pass the direct media URL so
   // Chromecast receives a playable file rather than an iframe page.
-  const { airplaySupported, openAirplayPicker, castAvailable, castState, castErrorMessage, startCast, stopCast } = useCasting(
+  const {
+    remotePlaybackSupported,
+    promptRemotePlayback,
+    airplaySupported,
+    openAirplayPicker,
+    castAvailable,
+    castState,
+    castErrorMessage,
+    startCast,
+    stopCast,
+  } = useCasting(
     videoRef,
     resolvedMedia?.castUrl || activeMediaSrc,
     title || 'Becky Pinder Video',
@@ -365,85 +375,104 @@ export default function VideoPlayer({
     };
   }, [embedUrl, provider, src]);
 
-  const handleCast = () => {
-    if (castState === 'connected') {
-      stopCast();
-      return;
+  const handleCast = async () => {
+    // Stop casting if already connected
+    if (castState === 'connected') { stopCast(); return; }
+    // Don't re-trigger while a connection is in progress
+    if (castState === 'connecting') return;
+
+    const video = videoRef.current;
+    const hasVideoElement = Boolean(video);
+
+    // ── STEP 1: Remote Playback API ─────────────────────────────────────────
+    // Most universal path. In Chrome this opens the Chromecast picker; in
+    // Safari it opens the AirPlay picker. A single API covers:
+    //   iOS Safari     → Apple TV / AirPlay 2 TVs
+    //   Android Chrome → Chromecast / Android TV / Google TV
+    //   Desktop Chrome → Chromecast
+    //   Desktop Safari → Apple TV
+    if (hasVideoElement && remotePlaybackSupported) {
+      if (video!.paused) video!.play().catch(() => {});
+      try {
+        await promptRemotePlayback();
+        return; // Picker was shown — success (user may have cancelled, that's fine)
+      } catch (e: any) {
+        // NotSupportedError = API exists but no devices found in this context.
+        // Fall through to platform-specific paths below.
+        if (e?.name !== 'NotSupportedError' && e?.name !== 'NotFoundError') {
+          return; // Any other error (NotAllowedError, etc.) = don't spam toasts
+        }
+      }
     }
 
-    if (castState === 'connecting') {
-      // Already in progress, don't re-trigger
-      return;
-    }
-
-    // iOS Safari/Chrome uses the native AirPlay video picker when a
-    // <video> element is available. Otherwise fall back to guidance.
-    if (isIOS()) {
-      const video = videoRef.current;
-      if (video && typeof (video as any).webkitShowPlaybackTargetPicker === 'function') {
-        // AirPlay mirrors the local play state. Make sure the video is playing
-        // before opening the picker, otherwise the receiver can freeze on the
-        // first frame.
-        if (video.paused) {
-          video.play().catch(() => {});
-        }
-        // Enter native fullscreen first. Many third-party AirPlay receivers
-        // only start video playback when the route is chosen from fullscreen.
-        const webkitVideo = video as any;
-        if (typeof webkitVideo.webkitEnterFullscreen === 'function') {
-          try {
-            webkitVideo.webkitEnterFullscreen();
-          } catch {
-            // Ignore if fullscreen is not allowed.
-          }
-        }
-        openAirplayPicker();
-        // HLS streams often AirPlay as audio-only to non-Apple-TV receivers.
-        // Warn the user when we don't have an MP4 so they know the limitation.
-        if (resolvedMedia?.castUrl && !isMp4Url(resolvedMedia.castUrl)) {
-          toast(
-            'This lesson uses an HLS stream. Some AirPlay receivers play audio only. Enable MP4 fallback in Bunny for best TV compatibility.',
-            { icon: '⚠️', duration: 7000 }
-          );
-        }
-      } else {
+    // ── STEP 2: AirPlay picker (Safari / WebKit fallback) ───────────────────
+    // Used when Remote Playback API is unavailable but WebKit AirPlay is.
+    if (hasVideoElement && airplaySupported) {
+      if (video!.paused) video!.play().catch(() => {});
+      // Entering WebKit fullscreen first improves compatibility with
+      // third-party AirPlay receivers that expect a full-screen context.
+      const wkVideo = video as any;
+      if (typeof wkVideo.webkitEnterFullscreen === 'function') {
+        try { wkVideo.webkitEnterFullscreen(); } catch { /* ignore */ }
+      }
+      openAirplayPicker();
+      if (resolvedMedia?.castUrl && !isMp4Url(resolvedMedia.castUrl)) {
         toast(
-          'On iPhone, tap the video to enter fullscreen, then tap the AirPlay icon and choose your receiver.',
-          { icon: '📱', duration: 8000 }
+          'Using HLS stream — some AirPlay receivers may play audio only. Enable MP4 fallback in Bunny for best results.',
+          { icon: '⚠️', duration: 7000 }
         );
       }
       return;
     }
 
-    // If there's no direct video URL we can send to Chromecast, guide the user
-    // to use the browser's built-in screen casting instead.
-    if (!resolvedMedia?.castUrl) {
+    // ── STEP 3: iOS without a video element (iframe mode) ───────────────────
+    // Bunny on iOS normally uses native video, but if it somehow fell through
+    // to iframe mode, guide the user to screen mirroring.
+    if (isIOS()) {
       toast(
-        'To cast this video to your TV: in Chrome, click the ⋮ menu → Cast → choose your TV.',
-        { icon: '📺', duration: 8000 }
+        'On iPhone/iPad: open Control Centre → Screen Mirroring → choose your Apple TV or AirPlay TV.',
+        { icon: '📱', duration: 9000 }
       );
       return;
     }
 
-    if (!castAvailable) {
-      const isChrome = typeof navigator !== 'undefined' &&
-        /Chrome/.test(navigator.userAgent) &&
-        !/Edg|OPR|Brave/.test(navigator.userAgent);
-      if (isChrome) {
+    // ── STEP 4: Google Cast SDK (Chrome, iframe mode with a direct URL) ──────
+    // This sends the video URL directly to the Chromecast/Android TV receiver.
+    // Works when the video is in an iframe (e.g. Bunny on desktop Chrome).
+    if (castAvailable && resolvedMedia?.castUrl) {
+      startCast();
+      return;
+    }
+
+    // ── STEP 5: Chrome but no castUrl, or Cast SDK still initialising ────────
+    const isChrome =
+      typeof navigator !== 'undefined' &&
+      /Chrome/.test(navigator.userAgent) &&
+      !/Edg|OPR|Brave/.test(navigator.userAgent);
+
+    if (isChrome) {
+      if (!resolvedMedia?.castUrl) {
+        // No direct video URL — use Chrome's native tab cast instead.
         toast(
-          'Chromecast is initialising. Please wait a moment and try again, or use Chrome menu → Cast.',
-          { icon: '⏳', duration: 6000 }
+          'Click the Chrome menu (⋮) → Cast → select your TV to mirror this tab.',
+          { icon: '📺', duration: 8000 }
         );
       } else {
+        // Cast SDK not yet ready.
         toast(
-          'For Chromecast, open this page in Google Chrome. For Apple TV, use Safari on iPhone/Mac.',
-          { icon: '📺', duration: 8000 }
+          'Chromecast is initialising — please wait a moment and try again.',
+          { icon: '⏳', duration: 5000 }
         );
       }
       return;
     }
 
-    startCast();
+    // ── STEP 6: Non-Chrome, non-iOS (Firefox, Edge, Samsung Browser, etc.) ───
+    toast(
+      'To cast to a Chromecast or Android TV: open this page in Google Chrome. ' +
+      'To cast to an Apple TV: use Safari on iPhone, iPad, or Mac.',
+      { icon: '📺', duration: 9000 }
+    );
   };
 
   // 1. Mouse movement timer to auto-hide control overlay

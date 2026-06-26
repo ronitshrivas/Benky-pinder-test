@@ -18,12 +18,31 @@ export function useCasting(
   mimeType?: string
 ) {
   const [airplaySupported, setAirplaySupported] = useState(false);
+  const [remotePlaybackSupported, setRemotePlaybackSupported] = useState(false);
   const [castAvailable, setCastAvailable] = useState(false);
   const [castSession, setCastSession] = useState<any>(null);
   const [castState, setCastState] = useState<'idle' | 'connecting' | 'connected' | 'error'>('idle');
   const [castErrorMessage, setCastErrorMessage] = useState<string | null>(null);
   const castContextRef = useRef<any>(null);
 
+  // Detect Remote Playback API support (covers Chromecast in Chrome + AirPlay in Safari)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) {
+      setRemotePlaybackSupported(false);
+      return;
+    }
+    const supported = 'remote' in video && typeof (video as any).remote?.prompt === 'function';
+    setRemotePlaybackSupported(supported);
+  }, [videoRef, videoSrc]);
+
+  const promptRemotePlayback = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || !('remote' in video)) {
+      throw new Error('Remote Playback API not available');
+    }
+    await (video as any).remote.prompt();
+  }, [videoRef]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -38,9 +57,7 @@ export function useCasting(
 
     if (!supported) return;
 
-    const onAvailabilityChange = (e: any) => {
-  
-    };
+    const onAvailabilityChange = (_e: any) => {};
 
     video.addEventListener('webkitplaybacktargetavailabilitychanged', onAvailabilityChange as EventListener);
     return () =>
@@ -179,6 +196,8 @@ export function useCasting(
   }, []);
 
   return {
+    remotePlaybackSupported,
+    promptRemotePlayback,
     airplaySupported,
     openAirplayPicker,
     castAvailable,
